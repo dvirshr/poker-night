@@ -150,7 +150,11 @@ export function useGame(gameId: string) {
     () =>
       playerTotals(
         seats.map(s => s.player_id),
-        rows.map(r => ({ id: r.id, playerId: r.player_id, type: r.type, amountIls: r.amount_ils, chipsCount: r.chips_count, reversesEntryId: r.reverses_entry_id })),
+        // only rows of seated players: before the seats load (or if the phone still holds an entry
+        // for a player it doesn't know yet) an unknown player must never crash the screen
+        rows
+          .filter(r => seats.some(s => s.player_id === r.player_id))
+          .map(r => ({ id: r.id, playerId: r.player_id, type: r.type, amountIls: r.amount_ils, chipsCount: r.chips_count, reversesEntryId: r.reverses_entry_id })),
       ),
     [seats, rows],
   );

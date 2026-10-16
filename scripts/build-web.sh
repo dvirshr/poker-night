@@ -2,8 +2,13 @@
 # Builds the web version into docs/ for GitHub Pages (https://dvirshr.github.io/poker-night).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# keep previous builds' JS chunks: an app still open on a phone may lazy-load them after a deploy
+OLD=$(mktemp -d)
+[ -d docs/_expo/static/js/web ] && cp -r docs/_expo/static/js/web/. "$OLD"/ || true
 rm -rf docs
 EXPO_OFFLINE=1 CI=1 npx expo export --platform web --output-dir docs
+cp -n "$OLD"/* docs/_expo/static/js/web/ 2>/dev/null || true
+rm -rf "$OLD"
 python3 - << 'PY'
 p = 'docs/index.html'
 s = open(p, encoding='utf-8').read()

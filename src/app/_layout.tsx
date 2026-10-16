@@ -7,7 +7,8 @@ import { useFonts, Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800Ex
 import { AuthProvider, useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
 import { flush } from '../lib/queue';
-import { Loading } from '../ui/kit';
+import { Loading, Screen, Txt, Btn } from '../ui/kit';
+import type { ErrorBoundaryProps } from 'expo-router';
 import { captureInviteFromUrl } from '../lib/invite';
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -47,5 +48,26 @@ export default function Root() {
       <StatusBar style="light" />
       <AuthProvider>{ready ? <Gate /> : <Loading />}</AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+/** Never a black screen: if a screen crashes, say so and offer a way out. */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <Screen>
+      <Txt size={24} weight="black" style={{ marginTop: 40, marginBottom: 8 }}>משהו השתבש במסך הזה</Txt>
+      <Txt muted style={{ marginBottom: 20 }}>הנתונים שמורים בשרת. נסו שוב, ואם זה חוזר, רענון מלא.</Txt>
+      <Btn title="לנסות שוב" onPress={() => void retry()} />
+      <Btn
+        title="רענון מלא"
+        kind="ghost"
+        style={{ marginTop: 10 }}
+        onPress={() => {
+          if (Platform.OS === 'web' && typeof window !== 'undefined') window.location.reload();
+          else void retry();
+        }}
+      />
+      <Txt muted size={11} style={{ marginTop: 20 }}>{String(error?.message ?? error)}</Txt>
+    </Screen>
   );
 }

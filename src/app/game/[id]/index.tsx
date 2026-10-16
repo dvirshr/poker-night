@@ -194,11 +194,12 @@ export default function Table() {
         left={sheet ? rebuysLeft(sheet) : 0}
         quick={game.quick_rebuys}
         canRebuy={!counting && game.rebuy_policy !== 'none' && !(sheet && tot(sheet).counted)}
-        canLeave={!counting && !!sheet && !tot(sheet).counted}
+        canLeave={!!sheet && !tot(sheet).counted}
+        counting={counting}
         buyIn={game.buy_in_ils}
         stack={game.start_stack_chips ?? game.buy_in_ils}
         onLeave={chips => {
-          enqueue({ game_id: id, player_id: sheet!, type: 'cash_out', amount_ils: chipsToIls(chips, game.buy_in_ils, game.start_stack_chips ?? game.buy_in_ils), chips_count: chips, note: 'יציאה באמצע הערב' });
+          enqueue({ game_id: id, player_id: sheet!, type: 'cash_out', amount_ils: chipsToIls(chips, game.buy_in_ils, game.start_stack_chips ?? game.buy_in_ils), chips_count: chips, note: counting ? null : 'יציאה באמצע הערב' });
           setSheet(null);
         }}
         onRebuy={amt => {
@@ -252,7 +253,7 @@ function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void
 function PlayerSheet(p: {
   open: boolean; onClose: () => void; name: string; entries: Entry[]; totalIn: number; left: number; quick: number[];
   canRebuy: boolean; onRebuy: (n: number) => void; onReverse: (e: Entry) => void;
-  canLeave: boolean; buyIn: number; stack: number; onLeave: (chips: number) => void;
+  canLeave: boolean; counting: boolean; buyIn: number; stack: number; onLeave: (chips: number) => void;
 }) {
   const [other, setOther] = useState('');
   const [leaving, setLeaving] = useState(false);
@@ -289,17 +290,17 @@ function PlayerSheet(p: {
       {p.canLeave && (
         leaving ? (
           <Card style={{ gap: 8, borderWidth: 1, borderColor: C.line }}>
-            <Txt weight="bold">יציאה מהשולחן</Txt>
+            <Txt weight="bold">{p.counting ? 'ספירת צ׳יפים' : 'יציאה מהשולחן'}</Txt>
             <Field label="כמה צ׳יפים יש לו עכשיו" value={chips} onChangeText={t => setChips(t.replace(/\D/g, '').slice(0, 7))} keyboardType="number-pad" autoFocus />
             <Num weight="black" size={20} color={C.acc}>{`= ${ils(value)}`}</Num>
             <Txt muted size={12}>נרשם עכשיו כספירה שלו. בסוף הערב הוא כבר יופיע כנספר. אפשר לבטל מההיסטוריה אם הוא חוזר.</Txt>
             <Row>
               <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => { setLeaving(false); setChips(''); }} />
-              <Btn small title="רישום יציאה" style={{ flex: 2 }} disabled={chips === ''} onPress={() => p.onLeave(n)} />
+              <Btn small title={p.counting ? 'שמירת ספירה' : 'רישום יציאה'} style={{ flex: 2 }} disabled={chips === ''} onPress={() => p.onLeave(n)} />
             </Row>
           </Card>
         ) : (
-          <Btn small kind="ghost" title="יציאה מהשולחן (ספירה עכשיו)" onPress={() => setLeaving(true)} />
+          <Btn small kind={p.counting ? 'primary' : 'ghost'} title={p.counting ? 'הזנת ספירה' : 'יציאה מהשולחן (ספירה עכשיו)'} onPress={() => setLeaving(true)} />
         )
       )}
       <Txt weight="bold" size={14}>היסטוריה</Txt>

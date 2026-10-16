@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "ערב פוקר",
+    "slug": "poker-night",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.dvirshr.pokernight"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.dvirshr.pokernight",
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "ערב פוקר",
+      "shortName": "פוקר",
+      "lang": "he",
+      "dir": "rtl",
+      "backgroundColor": "#111215",
+      "themeColor": "#111215"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-sqlite",
+      "expo-font",
+      [
+        "expo-localization",
+        {
+          "forcesRTL": true
+        }
+      ]
+    ],
+    "scheme": "pokernight",
+    "experiments": {
+      "typedRoutes": false,
+      "baseUrl": "/poker-night"
+    }
+  }
+}

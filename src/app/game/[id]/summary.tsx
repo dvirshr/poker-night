@@ -7,7 +7,7 @@ import { enqueue } from '../../../lib/queue';
 import { useGame, type Settlement } from '../../../lib/useGame';
 import { minTransfers, potPayouts, proportionalAdjustments } from '../../../core/settle';
 import { C, ils, medal } from '../../../lib/theme';
-import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Badge, Loading } from '../../../ui/kit';
+import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Badge, Loading, RefreshBtn } from '../../../ui/kit';
 import { Fireworks } from '../../../ui/Fireworks';
 
 const CELEBRATED = 'poker.celebrated.v1';
@@ -107,7 +107,7 @@ export default function Summary() {
     <Screen footer={footer}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Back label={closed ? 'הקבוצה' : 'לספירה'} to={closed ? `/group/${game.group_id}` : `/game/${id}/count`} />
-        {!closed && <LivePill live={g.live} unsynced={g.unsynced} />}
+        {!closed ? <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} /> : <RefreshBtn onPress={g.reload} />}
       </Row>
       <Txt size={26} weight="black">{cash ? 'חלוקת הקופה' : 'סגירת חשבון'}</Txt>
       <Row style={{ marginTop: 4, marginBottom: 12 }}>

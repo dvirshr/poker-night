@@ -98,7 +98,7 @@ export default function Count() {
         <Back label="לשולחן" to={`/game/${id}`} />
         <Row style={{ justifyContent: 'space-between' }}>
           <Txt size={26} weight="black">ספירת צ׳יפים</Txt>
-          <LivePill live={g.live} />
+          <LivePill live={g.live} onRefresh={g.reload} />
         </Row>
         {progress}
         {g.seats.map(s => {
@@ -133,7 +133,7 @@ export default function Count() {
       <KeepAwake />
       <Row style={{ justifyContent: 'space-between' }}>
         <Back label="לשולחן" to={`/game/${id}`} />
-        <LivePill live={g.live} unsynced={g.unsynced} />
+        <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} />
       </Row>
       <Txt size={26} weight="black">ספירת צ׳יפים</Txt>
       <Num muted size={13}>{`${ils(game.buy_in_ils)} = ${stack.toLocaleString('he-IL')} צ׳יפים`}</Num>

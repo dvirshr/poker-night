@@ -5,7 +5,7 @@ import { supabase, heError } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
 import { pendingInvite, clearPendingInvite } from '../lib/invite';
-import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge } from '../ui/kit';
+import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge , RefreshBtn, useOnResume } from '../ui/kit';
 
 type Membership = { id: string; role: string; status: string; group_id: string; groups: { name: string } | null };
 type OpenGame = { id: string; name: string; status: string; group_id: string };
@@ -48,6 +48,7 @@ export default function Home() {
     }
   }, [userId]);
   useFocusEffect(useCallback(() => void load(), [load]));
+  useOnResume(useCallback(() => void load(), [load]));
 
   const createGroup = async () => {
     setBusy(true);
@@ -77,7 +78,10 @@ export default function Home() {
     <Screen>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <H1 sub={me ? `שלום ${me}` : undefined}>ערב פוקר</H1>
-        <Btn title="יציאה" kind="ghost" small style={{ paddingHorizontal: 14 }} onPress={() => supabase.auth.signOut()} />
+        <Row>
+          <RefreshBtn onPress={load} />
+          <Btn title="יציאה" kind="ghost" small style={{ paddingHorizontal: 14 }} onPress={() => supabase.auth.signOut()} />
+        </Row>
       </Row>
       <ErrorBar text={err} onClose={() => setErr(null)} />
       {notice && (

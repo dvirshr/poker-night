@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import { pending, subscribe as onQueue, takeError } from './queue';
 import { playerTotals, potOf, gapOf, type LedgerEntry, type PlayerTotals } from '../core/settle';
 import { useAuth } from './auth';
+import { useOnResume } from '../ui/kit';
 
 export type Game = {
   id: string;
@@ -46,6 +47,7 @@ export function useGame(gameId: string) {
   const [live, setLive] = useState<Live>('reconnecting');
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -62,6 +64,10 @@ export function useGame(gameId: string) {
     }
     setError(null);
     setGame(g.data as Game);
+    if (userId) {
+      const me = await supabase.from('players').select('role').eq('group_id', (g.data as Game).group_id).eq('profile_id', userId).maybeSingle();
+      setIsAdmin(me.data?.role === 'admin');
+    }
     setSeats(
       (gp.data ?? [])
         .map((r: any) => ({ player_id: r.player_id, seat_no: r.seat_no, display_name: r.players.display_name, profile_id: r.players.profile_id }))
@@ -70,7 +76,7 @@ export function useGame(gameId: string) {
     setServer((le.data ?? []) as Row[]);
     setSettlements((st.data ?? []) as Settlement[]);
     setLoaded(true);
-  }, [gameId]);
+  }, [gameId, userId]);
 
   const reload = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -113,6 +119,15 @@ export function useGame(gameId: string) {
     [gameId, reload],
   );
 
+  // phone unlocked / app reopened: the realtime socket may have died while asleep, so fetch fresh data
+  useOnResume(reload);
+  // safety net: if realtime is down, poll every 10 s so the table still moves
+  useEffect(() => {
+    if (live === 'live') return;
+    const t = setInterval(() => void load(), 10000);
+    return () => clearInterval(t);
+  }, [live, load]);
+
   const rows: Row[] = useMemo(() => {
     const ids = new Set(server.map(r => r.id));
     const extra = queued
@@ -145,7 +160,7 @@ export function useGame(gameId: string) {
   const unsynced = queued.length;
 
   return {
-    game, seats, rows, totals, settlements, live, error, setError, loaded, isBanker, mySeat, unsynced,
+    game, seats, rows, totals, settlements, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced,
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

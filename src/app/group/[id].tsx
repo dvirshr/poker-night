@@ -6,7 +6,7 @@ import { supabase, heError } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { C, ils } from '../../lib/theme';
 import { inviteLink, inviteMessage } from '../../lib/invite';
-import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back } from '../../ui/kit';
+import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
 type Game = { id: string; name: string; status: string; played_on: string };
@@ -39,6 +39,7 @@ export default function Group() {
     setLeague((l.data ?? []) as League[]);
   }, [id]);
   useFocusEffect(useCallback(() => void load(), [load]));
+  useOnResume(useCallback(() => void load(), [load]));
 
   const me = players.find(p => p.profile_id === userId);
   const isAdmin = me?.role === 'admin';
@@ -63,7 +64,10 @@ export default function Group() {
 
   return (
     <Screen>
-      <Back label="הקבוצות שלי" to="/" />
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Back label="הקבוצות שלי" to="/" />
+        <RefreshBtn onPress={load} />
+      </Row>
       <H1 sub={`${active.length} שחקנים${isAdmin ? ' · אתה מנהל' : ''}`}>{group?.name ?? ''}</H1>
       <ErrorBar text={err} onClose={() => setErr(null)} />
 

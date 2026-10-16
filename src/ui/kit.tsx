@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -125,16 +125,53 @@ export function Seg<T extends string | number>({ label, value, options, onChange
   );
 }
 
-export function LivePill({ live, unsynced = 0 }: { live: Live; unsynced?: number }) {
+export function LivePill({ live, unsynced = 0, onRefresh }: { live: Live; unsynced?: number; onRefresh?: () => void }) {
   const ok = live === 'live' && unsynced === 0;
   const color = ok ? C.pos : C.neg;
   const label = live === 'live' ? (unsynced ? `שומר… (${unsynced})` : 'מעודכן') : 'מתחבר מחדש…';
   return (
-    <View style={[s.pill, { borderColor: ok ? C.line : C.neg }]} accessibilityLiveRegion="polite">
-      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-      <Txt size={12} color={ok ? C.muted : C.neg}>{label}</Txt>
-    </View>
+    <Row style={{ gap: 8 }}>
+      <View style={[s.pill, { borderColor: ok ? C.line : C.neg }]} accessibilityLiveRegion="polite">
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+        <Txt size={12} color={ok ? C.muted : C.neg}>{label}</Txt>
+      </View>
+      {onRefresh ? <RefreshBtn onPress={onRefresh} /> : null}
+    </Row>
   );
+}
+
+/** Round "refresh" button: reloads the screen's data from the server. */
+export function RefreshBtn({ onPress }: { onPress: () => void | Promise<unknown> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="רענון"
+      hitSlop={8}
+      disabled={busy}
+      onPress={async () => {
+        tap();
+        setBusy(true);
+        try { await onPress(); } finally { setTimeout(() => setBusy(false), 400); }
+      }}
+      style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+    >
+      {busy ? <ActivityIndicator size="small" color={C.acc} /> : <Txt size={20} weight="bold" color={C.acc} center>⟳</Txt>}
+    </Pressable>
+  );
+}
+
+/** Calls fn whenever the app comes back to the front (phone unlocked, tab re-opened). */
+export function useOnResume(fn: () => void) {
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', st => { if (st === 'active') fn(); });
+    const onVis = () => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') fn(); };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVis);
+    return () => {
+      sub.remove();
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [fn]);
 }
 
 export const Badge = ({ text, solid }: { text: string; solid?: boolean }) => (

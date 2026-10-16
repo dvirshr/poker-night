@@ -236,3 +236,40 @@ select test.ok((select count(*) from public.groups) = 0 and (select count(*) fro
                and (select count(*) from public.ledger_entries) = 0, 'signed-out visitor still sees no groups, players or money');
 reset role;
 select 'INVITE TESTS PASSED' as result;
+
+-- ---------- banker handover (migration 3) ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.games (id, group_id, buy_in_ils, start_stack_chips, banker_profile_id)
+values ('20000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 100, 1000, auth.uid());
+insert into public.game_players (game_id, player_id)
+select '20000000-0000-0000-0000-000000000003', id from public.players where display_name in ('אבי', 'רון', 'גל');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);  -- Gal: plain member, not banker
+update public.games set banker_profile_id = auth.uid() where id = '20000000-0000-0000-0000-000000000003';  -- RLS: matches 0 rows
+reset role;
+select test.ok((select banker_profile_id from public.games where id = '20000000-0000-0000-0000-000000000003') = '00000000-0000-0000-0000-00000000000a',
+               'a plain player cannot make himself banker (row untouched)');
+set role authenticated;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);  -- Avi: banker (and admin)
+update public.games set banker_profile_id = '00000000-0000-0000-0000-00000000000b' where id = '20000000-0000-0000-0000-000000000003';
+select test.ok((select banker_profile_id from public.games where id = '20000000-0000-0000-0000-000000000003') = '00000000-0000-0000-0000-00000000000b',
+               'banker hands over to Ron');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);  -- Ron: banker, NOT admin
+update public.games set banker_profile_id = '00000000-0000-0000-0000-00000000000d' where id = '20000000-0000-0000-0000-000000000003';
+select test.ok((select banker_profile_id from public.games where id = '20000000-0000-0000-0000-000000000003') = '00000000-0000-0000-0000-00000000000d',
+               'a non-admin banker can hand over too (new rule)');
+select test.fails($$insert into public.ledger_entries (game_id, player_id, type, amount_ils)
+                    select '20000000-0000-0000-0000-000000000003', id, 'buy_in', 100 from public.players where display_name='רון'$$,
+                  'row-level security', 'the old banker can no longer enter money');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);  -- Avi: admin takes it back
+update public.games set banker_profile_id = auth.uid() where id = '20000000-0000-0000-0000-000000000003';
+select test.ok((select banker_profile_id from public.games where id = '20000000-0000-0000-0000-000000000003') = auth.uid(),
+               'group admin can always reassign the banker');
+select test.fails($$update public.games set banker_profile_id = '00000000-0000-0000-0000-000000000099' where id = '20000000-0000-0000-0000-000000000003'$$,
+                  'active member', 'banker must be a member of the group');
+reset role;
+select 'HANDOVER TESTS PASSED' as result;

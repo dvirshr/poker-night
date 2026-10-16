@@ -28,6 +28,7 @@ export default function Table() {
   const [width, setWidth] = useState(0);
   const [sheet, setSheet] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [handing, setHanding] = useState(false);
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick(x => x + 1), 30000);
@@ -126,7 +127,7 @@ export default function Table() {
           </Txt>
           <Txt muted size={13}>{g.isBanker ? 'אתה הבנקאי' : `צפייה · בנקאי: ${g.seats.find(s => s.profile_id === game.banker_profile_id)?.display_name ?? '—'}`}</Txt>
         </View>
-        <LivePill live={g.live} unsynced={g.unsynced} />
+        <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} />
       </Row>
       <ErrorBar text={g.error ? heError({ message: g.error }) : null} onClose={() => g.setError(null)} />
       {counting && (
@@ -179,6 +180,9 @@ export default function Table() {
         </Card>
       )}
       {g.isBanker && !counting && <Txt muted size={12} center style={{ marginTop: 6 }}>הקשה על שחקן: כניסה חוזרת או תיקון</Txt>}
+      {(g.isBanker || g.isAdmin) && (
+        <Btn small kind="ghost" title="העברת תפקיד הבנקאי" style={{ marginTop: 14 }} onPress={() => setHanding(true)} />
+      )}
 
       <PlayerSheet
         open={!!sheet && g.isBanker}
@@ -194,6 +198,20 @@ export default function Table() {
           setSheet(null);
         }}
         onReverse={e => enqueue({ game_id: id, player_id: e.player_id, type: 'reversal', amount_ils: e.amount_ils, reverses_entry_id: e.id })}
+      />
+      <HandOver
+        open={handing}
+        onClose={() => setHanding(false)}
+        groupId={game.group_id}
+        current={game.banker_profile_id}
+        seatedProfiles={g.seats.map(s => s.profile_id).filter((x): x is string => !!x)}
+        unsynced={g.unsynced}
+        onPick={async profileId => {
+          const { error } = await supabase.from('games').update({ banker_profile_id: profileId }).eq('id', id);
+          if (error) return g.setError(heError(error));
+          setHanding(false);
+          void g.reload();
+        }}
       />
       <AddPlayer
         open={adding}
@@ -265,6 +283,38 @@ function PlayerSheet(p: {
         ))}
       </ScrollView>
       <Txt muted size={11}>ביטול לא מוחק: נרשמת שורת ביטול, וההיסטוריה נשמרת.</Txt>
+    </Sheet>
+  );
+}
+
+function HandOver({ open, onClose, groupId, current, seatedProfiles, unsynced, onPick }: {
+  open: boolean; onClose: () => void; groupId: string; current: string; seatedProfiles: string[]; unsynced: number; onPick: (profileId: string) => void;
+}) {
+  const [list, setList] = useState<{ profile_id: string; display_name: string }[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    supabase.from('players').select('profile_id, display_name').eq('group_id', groupId).eq('status', 'active').not('profile_id', 'is', null).order('display_name')
+      .then(({ data }) => {
+        const rows = ((data ?? []) as { profile_id: string; display_name: string }[]).filter(p => p.profile_id && p.profile_id !== current);
+        // players sitting at the table first
+        rows.sort((a, b) => Number(seatedProfiles.includes(b.profile_id)) - Number(seatedProfiles.includes(a.profile_id)));
+        setList(rows);
+      });
+  }, [open, groupId, current, seatedProfiles]);
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <Txt size={22} weight="black">העברת תפקיד הבנקאי</Txt>
+      <Txt muted size={13}>כל מה שנרשם עד עכשיו נשמר. הבנקאי החדש ממשיך מאותה נקודה, וכולם רואים את ההחלפה.</Txt>
+      {unsynced > 0 ? (
+        <Txt color={C.neg}>{`יש ${unsynced} רישומים שעוד לא נשמרו בשרת. חכו ל"מעודכן" ואז נסו שוב.`}</Txt>
+      ) : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {list.map(p => (
+            <Btn key={p.profile_id} small kind="ghost" title={`${p.display_name}${seatedProfiles.includes(p.profile_id) ? '' : ' · לא בשולחן'}`} onPress={() => onPick(p.profile_id)} />
+          ))}
+          {list.length === 0 && <Txt muted size={13}>אין עוד חברים עם חשבון באפליקציה. אורחים לא יכולים להיות בנקאים.</Txt>}
+        </View>
+      )}
     </Sheet>
   );
 }

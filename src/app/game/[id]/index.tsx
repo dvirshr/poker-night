@@ -5,6 +5,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { supabase, heError } from '../../../lib/supabase';
 import { enqueue } from '../../../lib/queue';
 import { useGame, type Row as Entry } from '../../../lib/useGame';
+import { chipsToIls } from '../../../core/settle';
 import { C, ils } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap } from '../../../ui/kit';
 
@@ -74,14 +75,14 @@ export default function Table() {
         disabled={!g.isBanker}
         onPress={() => { tap(); setSheet(pid); }}
         accessibilityLabel={`${s.display_name}, ${ils(t.totalIn)}`}
-        style={[{ width: SEAT_W, height: SEAT_H, borderRadius: 14, backgroundColor: mine ? C.raised : C.surf, borderWidth: mine ? 2.5 : 1.5, borderColor: mine ? C.acc : C.line, alignItems: 'center', justifyContent: 'center', gap: 2 }, style]}
+        style={[{ width: SEAT_W, height: SEAT_H, borderRadius: 14, backgroundColor: mine ? C.raised : C.surf, borderWidth: mine ? 2.5 : 1.5, borderColor: mine ? C.acc : C.line, alignItems: 'center', justifyContent: 'center', gap: 2, opacity: t.counted ? 0.55 : 1, borderStyle: t.counted ? 'dashed' : 'solid' }, style]}
       >
         <Row style={{ gap: 4 }}>
           <Txt weight="bold" size={14}>{s.display_name}</Txt>
           {t.rebuys > 0 && <Badge text={`×${t.rebuys + 1}`} />}
         </Row>
         <Row style={{ gap: 4 }}>
-          <Num muted size={12}>{ils(t.totalIn)}</Num>
+          <Num muted size={12}>{t.counted ? `יצא · ${ils(t.totalOut)}` : ils(t.totalIn)}</Num>
           {mine && <Badge solid text="אני" />}
           {!mine && isBankerSeat && <Badge text="בנקאי" />}
         </Row>
@@ -174,7 +175,7 @@ export default function Table() {
         <Card accent style={{ marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ gap: 4 }}>
             <Txt muted size={13}>המצב שלי</Txt>
-            <Txt weight="bold" size={17}>{`נכנסתי ${ils(me.totalIn)} · ${me.rebuys + 1} כניסות`}</Txt>
+            <Txt weight="bold" size={17}>{me.counted ? `יצאתי עם ${ils(me.totalOut)} · ${ils(me.net, true)}` : `נכנסתי ${ils(me.totalIn)} · ${me.rebuys + 1} כניסות`}</Txt>
           </View>
           {game.rebuy_policy !== 'none' && <Txt muted size={12}>{`נשארו ${Math.max(0, rebuysLeft(me.playerId))} ריבאיים`}</Txt>}
         </Card>
@@ -192,7 +193,14 @@ export default function Table() {
         totalIn={sheet ? tot(sheet).totalIn : 0}
         left={sheet ? rebuysLeft(sheet) : 0}
         quick={game.quick_rebuys}
-        canRebuy={!counting && game.rebuy_policy !== 'none'}
+        canRebuy={!counting && game.rebuy_policy !== 'none' && !(sheet && tot(sheet).counted)}
+        canLeave={!counting && !!sheet && !tot(sheet).counted}
+        buyIn={game.buy_in_ils}
+        stack={game.start_stack_chips ?? game.buy_in_ils}
+        onLeave={chips => {
+          enqueue({ game_id: id, player_id: sheet!, type: 'cash_out', amount_ils: chipsToIls(chips, game.buy_in_ils, game.start_stack_chips ?? game.buy_in_ils), chips_count: chips, note: 'יציאה באמצע הערב' });
+          setSheet(null);
+        }}
         onRebuy={amt => {
           enqueue({ game_id: id, player_id: sheet!, type: 'rebuy', amount_ils: amt });
           setSheet(null);
@@ -244,8 +252,14 @@ function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void
 function PlayerSheet(p: {
   open: boolean; onClose: () => void; name: string; entries: Entry[]; totalIn: number; left: number; quick: number[];
   canRebuy: boolean; onRebuy: (n: number) => void; onReverse: (e: Entry) => void;
+  canLeave: boolean; buyIn: number; stack: number; onLeave: (chips: number) => void;
 }) {
   const [other, setOther] = useState('');
+  const [leaving, setLeaving] = useState(false);
+  const [chips, setChips] = useState('');
+  useEffect(() => { if (!p.open) { setLeaving(false); setChips(''); } }, [p.open]);
+  const n = parseInt(chips, 10);
+  const value = Number.isFinite(n) ? chipsToIls(n, p.buyIn, p.stack) : 0;
   const reversed = new Set(p.entries.filter(e => e.type === 'reversal').map(e => e.reverses_entry_id));
   const live = p.entries.filter(e => e.type !== 'reversal' && !reversed.has(e.id));
   return (
@@ -272,12 +286,28 @@ function PlayerSheet(p: {
           <Txt color={C.neg}>הגיע למקסימום הריבאיים</Txt>
         )
       ) : null}
+      {p.canLeave && (
+        leaving ? (
+          <Card style={{ gap: 8, borderWidth: 1, borderColor: C.line }}>
+            <Txt weight="bold">יציאה מהשולחן</Txt>
+            <Field label="כמה צ׳יפים יש לו עכשיו" value={chips} onChangeText={t => setChips(t.replace(/\D/g, '').slice(0, 7))} keyboardType="number-pad" autoFocus />
+            <Num weight="black" size={20} color={C.acc}>{`= ${ils(value)}`}</Num>
+            <Txt muted size={12}>נרשם עכשיו כספירה שלו. בסוף הערב הוא כבר יופיע כנספר. אפשר לבטל מההיסטוריה אם הוא חוזר.</Txt>
+            <Row>
+              <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => { setLeaving(false); setChips(''); }} />
+              <Btn small title="רישום יציאה" style={{ flex: 2 }} disabled={chips === ''} onPress={() => p.onLeave(n)} />
+            </Row>
+          </Card>
+        ) : (
+          <Btn small kind="ghost" title="יציאה מהשולחן (ספירה עכשיו)" onPress={() => setLeaving(true)} />
+        )
+      )}
       <Txt weight="bold" size={14}>היסטוריה</Txt>
       <ScrollView style={{ maxHeight: 220 }}>
         {live.length === 0 && <Txt muted size={13}>אין רישומים</Txt>}
         {live.map(e => (
           <Row key={e.id} style={{ justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.line }}>
-            <Txt size={14}>{`${typeLabel[e.type]} · ${ils(e.amount_ils)}${e.pending ? ' · שומר…' : ''}`}</Txt>
+            <Txt size={14}>{`${e.type === 'cash_out' ? 'יציאה' : typeLabel[e.type]} · ${e.type === 'cash_out' && e.chips_count != null ? `${e.chips_count.toLocaleString('he-IL')} צ׳יפים = ` : ''}${ils(e.amount_ils)}${e.pending ? ' · שומר…' : ''}`}</Txt>
             <Btn small kind="danger" title="ביטול" style={{ height: 36, paddingHorizontal: 12 }} onPress={() => p.onReverse(e)} />
           </Row>
         ))}

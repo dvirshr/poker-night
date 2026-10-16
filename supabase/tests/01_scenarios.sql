@@ -273,3 +273,19 @@ select test.fails($$update public.games set banker_profile_id = '00000000-0000-0
                   'active member', 'banker must be a member of the group');
 reset role;
 select 'HANDOVER TESTS PASSED' as result;
+
+-- ---------- early exit: count a player while the game is still open ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);  -- Avi is banker of game 3 again
+insert into public.ledger_entries (game_id, player_id, type, amount_ils)
+select '20000000-0000-0000-0000-000000000003', id, 'buy_in', 100 from public.players where display_name in ('אבי', 'רון', 'גל');
+insert into public.ledger_entries (game_id, player_id, type, amount_ils, chips_count, note)
+select '20000000-0000-0000-0000-000000000003', id, 'cash_out', 75, 750, 'יציאה באמצע הערב' from public.players where display_name = 'גל';
+select test.ok((select counted and total_out = 75 and net = -25 from public.game_player_totals t join public.players p on p.id = t.player_id
+                where t.game_id = '20000000-0000-0000-0000-000000000003' and p.display_name = 'גל'), 'early exit recorded while the game is open (−25)');
+select test.ok((select status from public.games where id = '20000000-0000-0000-0000-000000000003') = 'open', 'game stays open for everyone else');
+select test.fails($$insert into public.ledger_entries (game_id, player_id, type, amount_ils, chips_count)
+                    select '20000000-0000-0000-0000-000000000003', id, 'cash_out', 75, 750 from public.players where display_name='גל'$$,
+                  'already counted', 'cannot count the same player twice');
+reset role;
+select 'EARLY EXIT TESTS PASSED' as result;

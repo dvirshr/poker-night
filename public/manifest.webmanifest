@@ -1,0 +1,18 @@
+{
+  "name": "ערב פוקר",
+  "short_name": "פוקר",
+  "description": "ניהול ערב פוקר: קופה, כניסות, ספירה והתחשבנות",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/poker-night/",
+  "scope": "/poker-night/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#111215",
+  "theme_color": "#111215",
+  "icons": [
+    { "src": "/poker-night/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/poker-night/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/poker-night/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

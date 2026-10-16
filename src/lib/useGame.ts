@@ -87,7 +87,7 @@ export function useGame(gameId: string) {
   useEffect(() => {
     void load();
     const ch = supabase
-      .channel(`game:${gameId}`)
+      .channel(`game:${gameId}:${Math.random().toString(36).slice(2, 10)}`) // unique per screen: table and count are both mounted in the stack
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ledger_entries', filter: `game_id=eq.${gameId}` }, p => {
         setServer(s => (s.some(r => r.id === (p.new as Row).id) ? s : [...s, p.new as Row]));
       })

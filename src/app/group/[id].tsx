@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { supabase, heError } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { C, ils } from '../../lib/theme';
+import { inviteLink, inviteMessage } from '../../lib/invite';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
@@ -170,13 +171,13 @@ export default function Group() {
                   <Num size={28} weight="black" color={C.acc} center>{invite}</Num>
                   <Txt muted size={12} center>בתוקף 7 ימים</Txt>
                   <Row>
-                    <Btn small kind="ghost" title="העתקה" style={{ flex: 1 }} onPress={() => Clipboard.setStringAsync(invite)} />
+                    <Btn small kind="ghost" title="העתקת קישור" style={{ flex: 1 }} onPress={() => Clipboard.setStringAsync(inviteLink(invite))} />
                     <Btn
                       small
                       kind="ghost"
                       title="שיתוף"
                       style={{ flex: 1 }}
-                      onPress={() => Share.share({ message: `הצטרפות לקבוצת הפוקר "${group?.name}": באפליקציה, "הצטרפות עם קוד" ←  ${invite}` })}
+                      onPress={() => Share.share({ message: inviteMessage(group?.name ?? '', invite) })}
                     />
                   </Row>
                 </>

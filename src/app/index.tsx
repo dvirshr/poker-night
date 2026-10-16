@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { supabase, heError } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
+import { pendingInvite, clearPendingInvite } from '../lib/invite';
 import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge } from '../ui/kit';
 
 type Membership = { id: string; role: string; status: string; group_id: string; groups: { name: string } | null };
@@ -20,6 +21,7 @@ export default function Home() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -31,7 +33,19 @@ export default function Home() {
     if (m.error) setErr(heError(m.error));
     setGroups((m.data ?? []) as unknown as Membership[]);
     setGames((g.data ?? []) as OpenGame[]);
-    setMe(p.data?.display_name ?? '');
+    const myName = p.data?.display_name ?? '';
+    setMe(myName);
+    const code = pendingInvite();
+    if (code && myName) {
+      clearPendingInvite();
+      const { error } = await supabase.rpc('join_group', { p_code: code, p_display_name: myName });
+      if (error) setErr(heError(error));
+      else {
+        setNotice('ביקשת להצטרף לקבוצה. מחכים לאישור המנהל.');
+        const again = await supabase.from('players').select('id, role, status, group_id, groups(name)').eq('profile_id', userId).neq('status', 'left');
+        setGroups((again.data ?? []) as unknown as Membership[]);
+      }
+    }
   }, [userId]);
   useFocusEffect(useCallback(() => void load(), [load]));
 
@@ -66,6 +80,11 @@ export default function Home() {
         <Btn title="יציאה" kind="ghost" small style={{ paddingHorizontal: 14 }} onPress={() => supabase.auth.signOut()} />
       </Row>
       <ErrorBar text={err} onClose={() => setErr(null)} />
+      {notice && (
+        <Card accent style={{ marginBottom: 12 }}>
+          <Txt weight="bold">{notice}</Txt>
+        </Card>
+      )}
 
       {games.length > 0 && (
         <View style={{ gap: 10, marginBottom: 20 }}>

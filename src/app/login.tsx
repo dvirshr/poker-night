@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { pendingInvite } from '../lib/invite';
 import { supabase, heError } from '../lib/supabase';
+import { C } from '../lib/theme';
 import { Screen, H1, Field, Btn, Seg, ErrorBar, Txt } from '../ui/kit';
 
 export default function Login() {
-  const [mode, setMode] = useState<'in' | 'up'>('in');
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<'in' | 'up'>(params.mode === 'up' ? 'up' : 'in');
+  const invited = !!pendingInvite();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -30,6 +35,7 @@ export default function Login() {
       <View style={{ height: 40 }} />
       <H1 sub="ניהול ערב פוקר: קופה, כניסות, ספירה והתחשבנות">ערב פוקר</H1>
       <Seg value={mode} onChange={setMode} options={[{ v: 'in', t: 'התחברות' }, { v: 'up', t: 'הרשמה' }]} />
+      {invited && <Txt size={13} color={C.acc} style={{ marginBottom: 12 }}>אחרי הכניסה תצורף לקבוצה שהזמינה אותך</Txt>}
       <ErrorBar text={err} onClose={() => setErr(null)} />
       {mode === 'up' && <Field label="השם שיופיע לחבר'ה" value={name} onChangeText={setName} maxLength={40} />}
       <Field label="מייל" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />

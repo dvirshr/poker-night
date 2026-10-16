@@ -22,8 +22,8 @@ begin
   end;
   raise exception 'FAIL: % (was not blocked)', label;
 end $$;
-grant usage on schema test to authenticated;
-grant execute on all functions in schema test to authenticated;
+grant usage on schema test to authenticated, anon;
+grant execute on all functions in schema test to authenticated, anon;
 
 -- users (as Supabase Auth would create them)
 insert into auth.users (id, email, raw_user_meta_data) values
@@ -226,3 +226,13 @@ select test.ok((select status from public.games where id = '20000000-0000-0000-0
 
 reset role;
 select 'ALL TESTS PASSED' as result;
+
+-- ---------- invite_info (migration 2): anyone with a valid code sees group + inviter, nothing else ----------
+set role anon;
+select test.ok((select group_name from public.invite_info('THURSDAY01')) = 'החבר''ה של חמישי'
+               and (select inviter from public.invite_info('THURSDAY01')) = 'אבי', 'invite_info shows group and inviter to a signed-out visitor');
+select test.ok((select count(*) from public.invite_info('NOSUCHCODE')) = 0, 'invite_info reveals nothing for a wrong code');
+select test.ok((select count(*) from public.groups) = 0 and (select count(*) from public.players) = 0
+               and (select count(*) from public.ledger_entries) = 0, 'signed-out visitor still sees no groups, players or money');
+reset role;
+select 'INVITE TESTS PASSED' as result;

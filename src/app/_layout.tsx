@@ -8,11 +8,13 @@ import { AuthProvider, useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
 import { flush } from '../lib/queue';
 import { Loading } from '../ui/kit';
+import { captureInviteFromUrl } from '../lib/invite';
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.dir = 'rtl';
   document.documentElement.lang = 'he';
   document.body.style.backgroundColor = C.bg;
+  captureInviteFromUrl();
 }
 
 function Gate() {

@@ -16,6 +16,7 @@ head = '''
 <meta name="apple-mobile-web-app-title" content="פוקר">
 <link rel="apple-touch-icon" href="/poker-night/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="/poker-night/favicon.png">
+<script>if('serviceWorker' in navigator){addEventListener('load',function(){navigator.serviceWorker.register('/poker-night/sw.js',{scope:'/poker-night/'})})}</script>
 '''
 if 'manifest.webmanifest' not in s:
     s = s.replace('</head>', head + '</head>', 1)

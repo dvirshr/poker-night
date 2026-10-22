@@ -41,7 +41,9 @@ export function heError(e: unknown): string {
     [/only the banker/i, 'רק הבנקאי יכול לעשות את זה'],
     [/only a group admin/i, 'רק מנהל הקבוצה יכול לעשות את זה'],
     [/banker must be an active member/i, 'הבנקאי חייב להיות חבר בקבוצה עם חשבון'],
-    [/duplicate key.*display_name/i, 'כבר יש שחקן בשם הזה בקבוצה'],
+    [/duplicate key.*display_name|players_active_name_unique/i, 'כבר יש שחקן בשם הזה בקבוצה'],
+    [/name taken by another member/i, 'השם הזה כבר תפוס בקבוצה. בחר שם אחר'],
+    [/name already in use/i, 'השם כבר בשימוש בקבוצה: לחבר להיסטוריה של האורח, או לבחור שם אחר'],
     [/row-level security/i, 'אין הרשאה לפעולה הזו'],
     [/Failed to fetch|Network request failed/i, 'אין חיבור לשרת'],
   ];

@@ -289,3 +289,46 @@ select test.fails($$insert into public.ledger_entries (game_id, player_id, type,
                   'already counted', 'cannot count the same player twice');
 reset role;
 select 'EARLY EXIT TESTS PASSED' as result;
+
+-- ---------- name conflicts (migration 4) ----------
+-- Avi (admin) adds guests "משה" and "דני" by hand; both later sign up with the same names
+insert into auth.users (id, email, raw_user_meta_data) values
+ ('00000000-0000-0000-0000-000000000071', 'moshe@x.com', '{"full_name":"משה"}'),
+ ('00000000-0000-0000-0000-000000000072', 'dani2@x.com', '{"full_name":"דני"}'),
+ ('00000000-0000-0000-0000-000000000073', 'ron2@x.com',  '{"full_name":"רון"}');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.players (group_id, display_name, is_guest) values
+  ('10000000-0000-0000-0000-000000000001', 'משה', true),
+  ('10000000-0000-0000-0000-000000000001', 'דני', true);
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000071', false);
+select public.join_group('THURSDAY01', 'משה');
+select test.ok((select count(*) from public.players where display_name = 'משה') = 1, 'joiner sees only his own request');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000072', false);
+select public.join_group('THURSDAY01', 'דני');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000073', false);
+select test.fails($$select public.join_group('THURSDAY01', 'רון')$$, 'name taken by another member',
+                  'same name as a member with an account: asked to pick another name');
+select public.join_group('THURSDAY01', 'רון כהן');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+reset role;
+select id as moshe_pending from public.players where display_name = 'משה' and status = 'pending' \gset
+select id as moshe_guest   from public.players where display_name = 'משה' and status = 'active' \gset
+select id as dani_pending  from public.players where display_name = 'דני' and status = 'pending' \gset
+set role authenticated;
+-- Moshe is the same person: link to the guest's history
+select public.approve_member(:'moshe_pending', :'moshe_guest');
+reset role;
+select test.ok((select profile_id from public.players where id = :'moshe_guest') = '00000000-0000-0000-0000-000000000071'
+               and (select count(*) from public.players where display_name = 'משה') = 1, 'same person: linked to the guest, no duplicate');
+set role authenticated;
+-- Dani is a different person: approving with the same name is refused, with a new name it works
+select test.fails(format('select public.approve_member(%L)', :'dani_pending'), 'name already in use',
+                  'different person with the same name must be renamed');
+select public.approve_member(:'dani_pending', null, 'דני לוי');
+reset role;
+select test.ok((select status from public.players where id = :'dani_pending') = 'active'
+               and (select display_name from public.players where id = :'dani_pending') = 'דני לוי', 'different person approved under a new name');
+select 'NAME CONFLICT TESTS PASSED' as result;

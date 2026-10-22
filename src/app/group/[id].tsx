@@ -23,6 +23,7 @@ export default function Group() {
   const [invite, setInvite] = useState<string | null>(null);
   const [guest, setGuest] = useState('');
   const [link, setLink] = useState<Record<string, string>>({});
+  const [names, setNames] = useState<Record<string, string>>({});
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -89,20 +90,61 @@ export default function Group() {
       {isAdmin && pendingList.length > 0 && (
         <Card style={{ marginBottom: 16, gap: 10 }}>
           <Txt weight="bold">ממתינים לאישור</Txt>
-          {pendingList.map(p => (
-            <View key={p.id} style={{ gap: 8, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 10 }}>
-              <Txt weight="bold">{p.display_name}</Txt>
-              {guests.length > 0 && (
-                <Seg
-                  label="זה שחקן שכבר רשום אצלנו?"
-                  value={link[p.id] ?? ''}
-                  onChange={v => setLink(l => ({ ...l, [p.id]: v }))}
-                  options={[{ v: '', t: 'שחקן חדש' }, ...guests.map(g => ({ v: g.id, t: g.display_name }))]}
+          {pendingList.map(p => {
+            const same = guests.find(g => g.display_name === p.display_name);
+            const choice = link[p.id] ?? same?.id ?? '';
+            const taken = active.some(a => a.display_name === p.display_name);
+            const needsName = choice === '' && taken;
+            const newName = names[p.id] ?? `${p.display_name} 2`;
+            return (
+              <View key={p.id} style={{ gap: 8, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 10 }}>
+                <Txt weight="bold">{p.display_name}</Txt>
+                {same ? (
+                  <>
+                    <Txt size={13} color={C.acc}>{`יש כבר אורח בשם "${same.display_name}" עם היסטוריה. זה אותו אדם?`}</Txt>
+                    <Seg
+                      value={choice}
+                      onChange={v => setLink(l => ({ ...l, [p.id]: v }))}
+                      options={[
+                        { v: same.id, t: `כן, לחבר להיסטוריה של ${same.display_name}` },
+                        { v: '', t: 'לא, אדם אחר' },
+                        ...guests.filter(g => g.id !== same.id).map(g => ({ v: g.id, t: g.display_name })),
+                      ]}
+                    />
+                  </>
+                ) : guests.length > 0 ? (
+                  <Seg
+                    label="זה שחקן שכבר רשום אצלנו?"
+                    value={choice}
+                    onChange={v => setLink(l => ({ ...l, [p.id]: v }))}
+                    options={[{ v: '', t: 'שחקן חדש' }, ...guests.map(g => ({ v: g.id, t: g.display_name }))]}
+                  />
+                ) : null}
+                {needsName && (
+                  <Field
+                    label="השם תפוס. באיזה שם הוא יופיע?"
+                    value={newName}
+                    onChangeText={t => setNames(n => ({ ...n, [p.id]: t }))}
+                    maxLength={40}
+                  />
+                )}
+                <Btn
+                  small
+                  title={choice ? 'אישור וחיבור להיסטוריה' : 'אישור'}
+                  disabled={needsName && (!newName.trim() || active.some(a => a.display_name === newName.trim()))}
+                  onPress={() =>
+                    run(() =>
+                      supabase.rpc('approve_member', {
+                        p_pending: p.id,
+                        p_link_guest: choice || null,
+                        p_new_name: needsName ? newName.trim() : null,
+                      }),
+                    )
+                  }
                 />
-              )}
-              <Btn small title="אישור" onPress={() => run(() => supabase.rpc('approve_member', { p_pending: p.id, p_link_guest: link[p.id] || null }))} />
-            </View>
-          ))}
+              </View>
+            );
+          })}
         </Card>
       )}
 

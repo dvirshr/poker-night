@@ -22,6 +22,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [retry, setRetry] = useState<{ code: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -39,7 +40,9 @@ export default function Home() {
     if (code && myName) {
       clearPendingInvite();
       const { error } = await supabase.rpc('join_group', { p_code: code, p_display_name: myName });
-      if (error) setErr(heError(error));
+      if (error && /name taken/i.test(error.message)) {
+        setRetry({ code, name: '' });
+      } else if (error) setErr(heError(error));
       else {
         setNotice('ביקשת להצטרף לקבוצה. מחכים לאישור המנהל.');
         const again = await supabase.from('players').select('id, role, status, group_id, groups(name)').eq('profile_id', userId).neq('status', 'left');
@@ -49,6 +52,18 @@ export default function Home() {
   }, [userId]);
   useFocusEffect(useCallback(() => void load(), [load]));
   useOnResume(useCallback(() => void load(), [load]));
+
+  const retryJoin = async () => {
+    if (!retry) return;
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase.rpc('join_group', { p_code: retry.code, p_display_name: retry.name.trim() });
+    setBusy(false);
+    if (error) return setErr(heError(error));
+    setRetry(null);
+    setNotice('ביקשת להצטרף לקבוצה. מחכים לאישור המנהל.');
+    void load();
+  };
 
   const createGroup = async () => {
     setBusy(true);
@@ -66,6 +81,10 @@ export default function Home() {
     setErr(null);
     const { error } = await supabase.rpc('join_group', { p_code: code.trim(), p_display_name: me });
     setBusy(false);
+    if (error && /name taken/i.test(error.message)) {
+      setPanel('none');
+      return setRetry({ code: code.trim(), name: '' });
+    }
     if (error) return setErr(heError(error));
     setPanel('none');
     setCode('');
@@ -84,6 +103,14 @@ export default function Home() {
         </Row>
       </Row>
       <ErrorBar text={err} onClose={() => setErr(null)} />
+      {retry && (
+        <Card accent style={{ marginBottom: 12, gap: 4 }}>
+          <Txt weight="bold" size={16}>{`השם "${me}" כבר תפוס בקבוצה`}</Txt>
+          <Txt muted size={13} style={{ marginBottom: 8 }}>יש שם כבר חבר אחר עם השם הזה. בחר שם שהחבר'ה יזהו, למשל עם אות משפחה.</Txt>
+          <Field label="השם שלך בקבוצה" value={retry.name} onChangeText={t => setRetry(r => (r ? { ...r, name: t } : r))} maxLength={40} placeholder={`${me} ל.`} />
+          <Btn title="שליחת בקשה" onPress={retryJoin} disabled={!retry.name.trim() || retry.name.trim() === me} busy={busy} />
+        </Card>
+      )}
       {notice && (
         <Card accent style={{ marginBottom: 12 }}>
           <Txt weight="bold">{notice}</Txt>

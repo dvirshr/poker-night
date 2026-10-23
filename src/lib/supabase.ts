@@ -44,6 +44,8 @@ export function heError(e: unknown): string {
     [/duplicate key.*display_name|players_active_name_unique/i, 'כבר יש שחקן בשם הזה בקבוצה'],
     [/name taken by another member/i, 'השם הזה כבר תפוס בקבוצה. בחר שם אחר'],
     [/name already in use/i, 'השם כבר בשימוש בקבוצה: לחבר להיסטוריה של האורח, או לבחור שם אחר'],
+    [/guest cannot be an admin/i, 'אורח בלי חשבון לא יכול להיות מנהל'],
+    [/at least one admin/i, 'בקבוצה חייב להישאר לפחות מנהל אחד'],
     [/row-level security/i, 'אין הרשאה לפעולה הזו'],
     [/Failed to fetch|Network request failed/i, 'אין חיבור לשרת'],
   ];

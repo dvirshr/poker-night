@@ -19,7 +19,7 @@ export default function Group() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [league, setLeague] = useState<League[]>([]);
-  const [tab, setTab] = useState<'league' | 'history' | 'members'>('league');
+  const [tab, setTab] = useState<'league' | 'history' | 'members' | 'settings'>('league');
   const [invite, setInvite] = useState<string | null>(null);
   const [guest, setGuest] = useState('');
   const [link, setLink] = useState<Record<string, string>>({});
@@ -148,7 +148,16 @@ export default function Group() {
         </Card>
       )}
 
-      <Seg value={tab} onChange={setTab} options={[{ v: 'league', t: 'טבלת ליגה' }, { v: 'history', t: 'היסטוריה' }, { v: 'members', t: 'שחקנים' }]} />
+      <Seg
+        value={tab}
+        onChange={setTab}
+        options={[
+          { v: 'league', t: 'טבלת ליגה' },
+          { v: 'history', t: 'היסטוריה' },
+          { v: 'members', t: 'שחקנים' },
+          ...(isAdmin ? [{ v: 'settings' as const, t: 'הגדרות' }] : []),
+        ]}
+      />
 
       {tab === 'league' && (
         <View style={{ gap: 6 }}>
@@ -232,6 +241,68 @@ export default function Group() {
               )}
             </Card>
           )}
+        </View>
+      )}
+
+      {tab === 'settings' && isAdmin && group && (
+        <View style={{ gap: 12 }}>
+          <Card style={{ gap: 6 }}>
+            <Txt weight="bold" size={16}>מי פותח ערב</Txt>
+            <Seg
+              value={group.banker_mode}
+              onChange={v => run(() => supabase.from('groups').update({ banker_mode: v }).eq('id', id))}
+              options={[
+                { v: 'opener_is_banker', t: 'כל חבר רשום' },
+                { v: 'admin_assigns', t: 'מנהל בלבד' },
+              ]}
+            />
+            <Txt muted size={12}>
+              {group.banker_mode === 'opener_is_banker'
+                ? 'כל חבר עם חשבון יכול לפתוח ערב, והוא הבנקאי. מתאים לערבים שהמנהל לא מגיע אליהם.'
+                : 'רק מנהל פותח ערב וממנה בנקאי. אם אין מנהל בערב, אי אפשר לפתוח.'}
+            </Txt>
+          </Card>
+
+          <Card style={{ gap: 6 }}>
+            <Txt weight="bold" size={16}>מנהלים</Txt>
+            <Txt muted size={12} style={{ marginBottom: 4 }}>מנהל מאשר חברים חדשים, ממנה בנקאי ומשנה הגדרות. כדאי שיהיה יותר מאחד.</Txt>
+            {active
+              .filter(p => p.profile_id)
+              .map(p => {
+                const admin = p.role === 'admin';
+                const lastAdmin = admin && active.filter(a => a.role === 'admin').length === 1;
+                return (
+                  <Row key={p.id} style={{ justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: C.line }}>
+                    <Row>
+                      <Txt weight="bold">{p.display_name}</Txt>
+                      {admin && <Badge text="מנהל" />}
+                      {p.profile_id === userId && <Badge solid text="אני" />}
+                    </Row>
+                    {admin ? (
+                      <Btn
+                        small
+                        kind="ghost"
+                        title={lastAdmin ? 'מנהל יחיד' : 'הסרת ניהול'}
+                        disabled={lastAdmin}
+                        style={{ height: 40, paddingHorizontal: 12 }}
+                        onPress={() => run(() => supabase.from('players').update({ role: 'member' }).eq('id', p.id))}
+                      />
+                    ) : (
+                      <Btn
+                        small
+                        kind="ghost"
+                        title="מינוי למנהל"
+                        style={{ height: 40, paddingHorizontal: 12 }}
+                        onPress={() => run(() => supabase.from('players').update({ role: 'admin' }).eq('id', p.id))}
+                      />
+                    )}
+                  </Row>
+                );
+              })}
+            {active.filter(p => !p.profile_id).length > 0 && (
+              <Txt muted size={11} style={{ marginTop: 4 }}>אורחים בלי חשבון לא יכולים להיות מנהלים.</Txt>
+            )}
+          </Card>
         </View>
       )}
     </Screen>

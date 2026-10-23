@@ -332,3 +332,32 @@ reset role;
 select test.ok((select status from public.players where id = :'dani_pending') = 'active'
                and (select display_name from public.players where id = :'dani_pending') = 'דני לוי', 'different person approved under a new name');
 select 'NAME CONFLICT TESTS PASSED' as result;
+
+-- ---------- group settings (migration 5) ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);  -- Ron: plain member
+update public.groups set banker_mode = 'admin_assigns' where id = '10000000-0000-0000-0000-000000000001';
+reset role;
+select test.ok((select banker_mode from public.groups where id = '10000000-0000-0000-0000-000000000001') = 'opener_is_banker',
+               'a plain member cannot change group settings');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);  -- Avi: admin
+update public.groups set banker_mode = 'admin_assigns' where id = '10000000-0000-0000-0000-000000000001';
+select test.ok((select banker_mode from public.groups where id = '10000000-0000-0000-0000-000000000001') = 'admin_assigns',
+               'admin switches to "admin assigns"');
+update public.groups set banker_mode = 'opener_is_banker' where id = '10000000-0000-0000-0000-000000000001';
+
+update public.players set role = 'admin' where display_name = 'רון' and group_id = '10000000-0000-0000-0000-000000000001';
+select test.ok((select role from public.players where display_name = 'רון' and group_id = '10000000-0000-0000-0000-000000000001') = 'admin',
+               'admin promotes Ron to admin');
+insert into public.players (group_id, display_name, is_guest) values ('10000000-0000-0000-0000-000000000001', 'אורח מנהל', true);
+select test.fails($$update public.players set role = 'admin' where display_name = 'אורח מנהל'$$, 'guest cannot be an admin',
+                  'a guest cannot be made admin');
+-- Ron demotes Avi: fine, Ron is still admin
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.players set role = 'member' where profile_id = '00000000-0000-0000-0000-00000000000a' and group_id = '10000000-0000-0000-0000-000000000001';
+select test.fails($$update public.players set role = 'member' where profile_id = '00000000-0000-0000-0000-00000000000b' and group_id = '10000000-0000-0000-0000-000000000001'$$,
+                  'at least one admin', 'the last admin cannot step down');
+update public.players set role = 'admin' where profile_id = '00000000-0000-0000-0000-00000000000a' and group_id = '10000000-0000-0000-0000-000000000001';
+reset role;
+select 'SETTINGS TESTS PASSED' as result;

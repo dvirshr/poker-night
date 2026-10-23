@@ -33,3 +33,11 @@ export const ils = (n: number, signed = false) => {
   // a signed amount is isolated left-to-right so "+160 ₪" never renders as "₪ 160+" inside Hebrew text
   return sign ? `\u2066${sign}${s} ₪\u2069` : `${s} ₪`;
 };
+
+export type ThemeKey = 'graphite' | 'green' | 'vegas' | 'ocean';
+export const THEMES: Record<ThemeKey, { name: string; felt: string; rail: string }> = {
+  graphite: { name: 'גרפיט', felt: '#1F232B', rail: '#3A3E48' },
+  green: { name: 'לבד ירוק', felt: '#1E5A43', rail: '#5A3A22' },
+  vegas: { name: 'וגאס', felt: '#6E1F2A', rail: '#2B1A12' },
+  ocean: { name: 'ים', felt: '#17435E', rail: '#2E3B47' },
+};

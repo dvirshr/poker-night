@@ -33,7 +33,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --experimental-strip-types --no-warnings --test src/core/settle.test.ts",
+    "test": "node --experimental-strip-types --no-warnings --test src/core/settle.test.ts src/core/stats.test.ts",
     "test:db": "./run_db_tests.sh",
     "typecheck": "tsc --noEmit",
     "export:web": "expo export --platform web"

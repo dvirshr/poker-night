@@ -5,7 +5,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { supabase, heError } from '../../../lib/supabase';
 import { enqueue } from '../../../lib/queue';
 import { useGame } from '../../../lib/useGame';
-import { chipsToIls } from '../../../core/settle';
+import { chipsToIls, proportionalAdjustments } from '../../../core/settle';
 import { C, ils } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Loading, tap } from '../../../ui/kit';
 
@@ -19,6 +19,7 @@ export default function Count() {
   const g = useGame(id);
   const [cur, setCur] = useState<string | null>(null);
   const [digits, setDigits] = useState('');
+  const [confirmRecount, setConfirmRecount] = useState(false);
 
   const game = g.game;
   useEffect(() => {
@@ -141,6 +142,28 @@ export default function Count() {
       {tabs}
       {progress}
 
+      {allCounted && g.gap !== 0 && (
+        <Card style={{ borderWidth: 1, borderColor: C.neg, gap: 8, marginBottom: 12 }}>
+          <Txt weight="bold" size={17}>{g.gap > 0 ? `נספר ${ils(g.gap)} יותר מהקופה` : `חסרים ${ils(-g.gap)} בספירה`}</Txt>
+          <Txt muted size={13}>אפשר לספור שוב שחקן מסוים (הקשה על השם), או לאזן יחסית: כל יציאה מוכפלת באותו יחס, מעוגל לשקל, ונרשמת שורת איזון ביומן.</Txt>
+          <Btn
+            small
+            title="איזון יחסי"
+            disabled={g.unsynced > 0}
+            onPress={() => {
+              for (const [pid, amt] of proportionalAdjustments(g.totals)) {
+                enqueue({ game_id: id, player_id: pid, type: 'adjustment', amount_ils: amt, note: 'איזון יחסי' });
+              }
+            }}
+          />
+        </Card>
+      )}
+      {allCounted && g.gap === 0 && (
+        <Card style={{ borderWidth: 1, borderColor: C.pos, marginBottom: 12 }}>
+          <Txt weight="bold" color={C.pos}>✓ הקופה מאוזנת. אפשר לעבור לסיכום.</Txt>
+        </Card>
+      )}
+
       {cur && curT && (
         existing ? (
           <Card style={{ alignItems: 'center', gap: 8 }}>
@@ -185,6 +208,31 @@ export default function Count() {
             );
           })}
         </View>
+      )}
+      {counted.length > 1 && (
+        <Btn
+          small
+          kind={confirmRecount ? 'danger' : 'ghost'}
+          title={confirmRecount ? 'לחיצה נוספת: לבטל את כל הספירות ולספור מחדש' : 'ספירה מחדש לכולם'}
+          style={{ marginTop: 16 }}
+          disabled={g.unsynced > 0}
+          onPress={() => {
+            if (!confirmRecount) {
+              setConfirmRecount(true);
+              setTimeout(() => setConfirmRecount(false), 4000);
+              return;
+            }
+            setConfirmRecount(false);
+            const reversed = new Set(g.rows.filter(r => r.type === 'reversal').map(r => r.reverses_entry_id));
+            for (const r of g.rows) {
+              if ((r.type === 'cash_out' || r.type === 'adjustment') && !reversed.has(r.id)) {
+                enqueue({ game_id: id, player_id: r.player_id, type: 'reversal', amount_ils: r.amount_ils, reverses_entry_id: r.id, note: 'ספירה מחדש לכולם' });
+              }
+            }
+            setCur(null);
+            setDigits('');
+          }}
+        />
       )}
       {!allCounted && counted.length === 0 && (
         <Btn

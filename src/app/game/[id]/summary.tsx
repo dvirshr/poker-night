@@ -198,6 +198,7 @@ export default function Summary() {
             })}
           </View>
           {closed && <Txt muted size={12} style={{ marginTop: 10 }}>רישום בלבד. התשלומים עצמם באחריות השחקנים.</Txt>}
+          <Btn small kind="ghost" title="📜 יומן הערב המלא" style={{ marginTop: 12 }} onPress={() => router.push(`/game/${id}/log`)} />
         </>
       )}
     </Screen>

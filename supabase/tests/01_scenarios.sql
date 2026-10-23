@@ -361,3 +361,30 @@ select test.fails($$update public.players set role = 'member' where profile_id =
 update public.players set role = 'admin' where profile_id = '00000000-0000-0000-0000-00000000000a' and group_id = '10000000-0000-0000-0000-000000000001';
 reset role;
 select 'SETTINGS TESTS PASSED' as result;
+
+-- ---------- wave 1 (migration 6): unlink + theme ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);  -- Avi admin
+reset role;
+select id as moshe_row from public.players where profile_id = '00000000-0000-0000-0000-000000000071' \gset
+set role authenticated;
+select public.unlink_member(:'moshe_row');
+reset role;
+select test.ok((select profile_id is null and is_guest from public.players where id = :'moshe_row'), 'unlinked row is a guest again, history kept');
+select test.ok((select status from public.players where profile_id = '00000000-0000-0000-0000-000000000071') = 'pending', 'account is back in the approval queue');
+set role authenticated;
+select test.fails($$select public.unlink_member((select id from public.players where profile_id = auth.uid() limit 1))$$, 'cannot unlink yourself', 'admin cannot unlink himself');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);  -- Gal: member
+select test.fails(format('select public.unlink_member(%L)', :'moshe_row'), '', 'a member cannot unlink anyone');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+update public.groups set table_theme = 'vegas' where id = '10000000-0000-0000-0000-000000000001';
+select test.ok((select table_theme from public.groups where id = '10000000-0000-0000-0000-000000000001') = 'vegas', 'admin sets table theme');
+select test.fails($$update public.groups set table_theme = 'pink' where id = '10000000-0000-0000-0000-000000000001'$$, 'check', 'unknown theme rejected');
+-- re-approve Moshe, linked to his guest row again
+reset role;
+select id as moshe_pend from public.players where profile_id = '00000000-0000-0000-0000-000000000071' \gset
+set role authenticated;
+select public.approve_member(:'moshe_pend', :'moshe_row');
+reset role;
+select test.ok((select profile_id from public.players where id = :'moshe_row') = '00000000-0000-0000-0000-000000000071', 're-approved and linked correctly');
+select 'WAVE1 TESTS PASSED' as result;

@@ -4,6 +4,7 @@ import { pending, subscribe as onQueue, takeError } from './queue';
 import { playerTotals, potOf, gapOf, type LedgerEntry, type PlayerTotals } from '../core/settle';
 import { useAuth } from './auth';
 import { useOnResume } from '../ui/kit';
+import { THEMES, type ThemeKey } from './theme';
 
 export type Game = {
   id: string;
@@ -32,6 +33,7 @@ export type Row = {
   reverses_entry_id: string | null;
   note: string | null;
   created_at: string;
+  created_by?: string | null;
   pending?: boolean;
 };
 export type Settlement = { from_player_id: string | null; to_player_id: string; amount_ils: number; method: 'from_pot' | 'transfer' };
@@ -48,6 +50,7 @@ export function useGame(gameId: string) {
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [theme, setTheme] = useState<ThemeKey>('graphite');
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -64,10 +67,15 @@ export function useGame(gameId: string) {
     }
     setError(null);
     setGame(g.data as Game);
-    if (userId) {
-      const me = await supabase.from('players').select('role').eq('group_id', (g.data as Game).group_id).eq('profile_id', userId).maybeSingle();
-      setIsAdmin(me.data?.role === 'admin');
-    }
+    const [me, grp] = await Promise.all([
+      userId
+        ? supabase.from('players').select('role').eq('group_id', (g.data as Game).group_id).eq('profile_id', userId).maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase.from('groups').select('*').eq('id', (g.data as Game).group_id).maybeSingle(),
+    ]);
+    setIsAdmin((me.data as { role?: string } | null)?.role === 'admin');
+    const tk = (grp.data as { table_theme?: ThemeKey } | null)?.table_theme;
+    if (tk && THEMES[tk]) setTheme(tk);
     setSeats(
       (gp.data ?? [])
         .map((r: any) => ({ player_id: r.player_id, seat_no: r.seat_no, display_name: r.players.display_name, profile_id: r.players.profile_id }))
@@ -164,7 +172,7 @@ export function useGame(gameId: string) {
   const unsynced = queued.length;
 
   return {
-    game, seats, rows, totals, settlements, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced,
+    game, seats, rows, totals, settlements, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[theme],
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

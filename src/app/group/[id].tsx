@@ -6,6 +6,9 @@ import { supabase, heError } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { C, ils } from '../../lib/theme';
 import { inviteLink, inviteMessage } from '../../lib/invite';
+import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
+import { monthly, monthName } from '../../core/stats';
+import { THEMES, type ThemeKey } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
@@ -15,11 +18,13 @@ type League = { player_id: string; display_name: string; games_played: number; n
 export default function Group() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { userId } = useAuth();
-  const [group, setGroup] = useState<{ name: string; banker_mode: string } | null>(null);
+  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey } | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [league, setLeague] = useState<League[]>([]);
-  const [tab, setTab] = useState<'league' | 'history' | 'members' | 'settings'>('league');
+  const [tab, setTab] = useState<'league' | 'month' | 'history' | 'members' | 'settings'>('league');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [rename, setRename] = useState('');
   const [invite, setInvite] = useState<string | null>(null);
   const [guest, setGuest] = useState('');
   const [link, setLink] = useState<Record<string, string>>({});
@@ -28,7 +33,7 @@ export default function Group() {
 
   const load = useCallback(async () => {
     const [g, p, gm, l] = await Promise.all([
-      supabase.from('groups').select('name, banker_mode').eq('id', id).single(),
+      supabase.from('groups').select('*').eq('id', id).single(),
       supabase.from('players').select('id, display_name, role, status, is_guest, profile_id').eq('group_id', id).order('display_name'),
       supabase.from('games').select('id, name, status, played_on').eq('group_id', id).order('created_at', { ascending: false }),
       supabase.from('league_table').select('*').eq('group_id', id).order('net_total', { ascending: false }),
@@ -39,8 +44,9 @@ export default function Group() {
     setGames((gm.data ?? []) as Game[]);
     setLeague((l.data ?? []) as League[]);
   }, [id]);
-  useFocusEffect(useCallback(() => void load(), [load]));
-  useOnResume(useCallback(() => void load(), [load]));
+  const stats = useGroupStats(id);
+  useFocusEffect(useCallback(() => { void load(); void stats.reload(); }, [load, stats.reload]));
+  useOnResume(useCallback(() => { void load(); void stats.reload(); }, [load, stats.reload]));
 
   const me = players.find(p => p.profile_id === userId);
   const isAdmin = me?.role === 'admin';
@@ -153,6 +159,7 @@ export default function Group() {
         onChange={setTab}
         options={[
           { v: 'league', t: 'טבלת ליגה' },
+          { v: 'month', t: 'חודשי' },
           { v: 'history', t: 'היסטוריה' },
           { v: 'members', t: 'שחקנים' },
           ...(isAdmin ? [{ v: 'settings' as const, t: 'הגדרות' }] : []),
@@ -162,18 +169,45 @@ export default function Group() {
       {tab === 'league' && (
         <View style={{ gap: 6 }}>
           {league.length === 0 && <Txt muted>הטבלה תתמלא אחרי הערב הראשון שנסגר</Txt>}
+          {stats.titles.size > 0 && (
+            <Txt muted size={12} style={{ marginBottom: 4 }}>
+              {[...new Map([...stats.titles.values()].flat().map(t => [t.key, t])).values()].map(t => `${t.emoji} ${t.label}`).join(' · ')}
+            </Txt>
+          )}
           {league.map((l, i) => (
-            <Card key={l.player_id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
+            <Card key={l.player_id} onPress={() => router.push(`/player/${id}/${l.player_id}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
               <Row>
                 <Num weight="black" size={16} color={C.muted}>{i + 1}</Num>
                 <View>
-                  <Txt weight="bold">{l.display_name}</Txt>
+                  <Txt weight="bold">{`${l.display_name} ${titleBadges(stats.titles.get(l.player_id))}`}</Txt>
                   <Txt muted size={12}>{`${l.games_played} ערבים · ${l.wins} נצחונות · ממוצע ${ils(l.net_avg, true)}`}</Txt>
                 </View>
               </Row>
               <Num weight="black" size={18} color={l.net_total > 0 ? C.pos : l.net_total < 0 ? C.neg : C.muted}>{ils(l.net_total, true)}</Num>
             </Card>
           ))}
+        </View>
+      )}
+
+      {tab === 'month' && (
+        <View style={{ gap: 8 }}>
+          {monthly(stats.nights, stats.transfers).length === 0 && <Txt muted>הסיכום יופיע אחרי הערב הראשון שנסגר</Txt>}
+          {monthly(stats.nights, stats.transfers).map(m => {
+            const lines = [
+              `🃏 ${group?.name ?? ''} · ${monthName(m.month)}`,
+              `${m.nights} ערבים · ${m.players} שחקנים · ${ils(m.pot)} עברו בקופה`,
+              m.king ? `👑 מלך החודש: ${m.king.name} ${ils(m.king.net, true)}` : '',
+              m.bestNight ? `🚀 הערב הכי טוב: ${m.bestNight.name} ${ils(m.bestNight.net, true)} (${new Date(m.bestNight.playedOn).toLocaleDateString('he-IL')})` : '',
+              m.biggestTransfer ? `💸 ההעברה הכי גדולה: ${m.biggestTransfer.from} ← ${m.biggestTransfer.to} ${ils(m.biggestTransfer.amountIls)}` : '',
+            ].filter(Boolean);
+            return (
+              <Card key={m.month} style={{ gap: 6 }}>
+                <Txt weight="black" size={18}>{monthName(m.month)}</Txt>
+                {lines.slice(1).map((l, i) => <Txt key={i} size={14}>{l}</Txt>)}
+                <Btn small kind="ghost" title="שיתוף הסיכום" style={{ marginTop: 6 }} onPress={() => Share.share({ message: lines.join('\n') })} />
+              </Card>
+            );
+          })}
         </View>
       )}
 
@@ -194,14 +228,57 @@ export default function Group() {
       {tab === 'members' && (
         <View style={{ gap: 6 }}>
           {active.map(p => (
-            <Card key={p.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
-              <Txt weight="bold">{p.display_name}</Txt>
-              <Row>
-                {p.role === 'admin' && <Badge text="מנהל" />}
-                {!p.profile_id && <Badge text="אורח" />}
-                {p.profile_id === userId && <Badge solid text="אני" />}
-              </Row>
-            </Card>
+            <View key={p.id} style={{ gap: 6 }}>
+              <Card onPress={() => router.push(`/player/${id}/${p.id}`)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
+                <Txt weight="bold">{`${p.display_name} ${titleBadges(stats.titles.get(p.id))}`}</Txt>
+                <Row>
+                  {p.role === 'admin' && <Badge text="מנהל" />}
+                  {!p.profile_id && <Badge text="אורח" />}
+                  {p.profile_id === userId && <Badge solid text="אני" />}
+                  {isAdmin && (
+                    <Btn
+                      small
+                      kind="ghost"
+                      title={editing === p.id ? 'סגירה' : 'עריכה'}
+                      style={{ height: 36, paddingHorizontal: 10 }}
+                      onPress={() => { setEditing(editing === p.id ? null : p.id); setRename(p.display_name); }}
+                    />
+                  )}
+                </Row>
+              </Card>
+              {isAdmin && editing === p.id && (
+                <Card style={{ gap: 6, borderWidth: 1, borderColor: C.line }}>
+                  <Field label="שינוי שם" value={rename} onChangeText={setRename} maxLength={40} />
+                  <Btn
+                    small
+                    title="שמירת שם"
+                    disabled={!rename.trim() || rename.trim() === p.display_name || active.some(a => a.display_name === rename.trim())}
+                    onPress={() => run(async () => {
+                      const r = await supabase.from('players').update({ display_name: rename.trim() }).eq('id', p.id);
+                      if (!r.error) setEditing(null);
+                      return r;
+                    })}
+                  />
+                  <Txt muted size={11}>ההיסטוריה נשמרת. השם מתעדכן בכל הערבים והליגה.</Txt>
+                  {p.profile_id && p.profile_id !== userId && (
+                    <>
+                      <View style={{ height: 6 }} />
+                      <Btn
+                        small
+                        kind="danger"
+                        title="ניתוק חשבון (אישור מחדש)"
+                        onPress={() => run(async () => {
+                          const r = await supabase.rpc('unlink_member', { p_player: p.id });
+                          if (!r.error) setEditing(null);
+                          return r;
+                        })}
+                      />
+                      <Txt muted size={11}>לתיקון חיבור שגוי: השחקן כאן חוזר להיות אורח עם ההיסטוריה שלו, והחשבון חוזר לרשימת הממתינים כדי לאשר אותו נכון.</Txt>
+                    </>
+                  )}
+                </Card>
+              )}
+            </View>
           ))}
           <Card style={{ marginTop: 10, gap: 4 }}>
             <Field label="הוספת אורח (בלי אפליקציה)" value={guest} onChangeText={setGuest} maxLength={40} />
@@ -261,6 +338,26 @@ export default function Group() {
                 ? 'כל חבר עם חשבון יכול לפתוח ערב, והוא הבנקאי. מתאים לערבים שהמנהל לא מגיע אליהם.'
                 : 'רק מנהל פותח ערב וממנה בנקאי. אם אין מנהל בערב, אי אפשר לפתוח.'}
             </Txt>
+          </Card>
+
+          <Card style={{ gap: 6 }}>
+            <Txt weight="bold" size={16}>עיצוב השולחן</Txt>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {(Object.keys(THEMES) as ThemeKey[]).map(k => {
+                const t = THEMES[k];
+                const on = (group.table_theme ?? 'graphite') === k;
+                return (
+                  <Card
+                    key={k}
+                    onPress={() => run(() => supabase.from('groups').update({ table_theme: k }).eq('id', id))}
+                    style={{ width: 92, alignItems: 'center', padding: 10, borderWidth: on ? 2 : 1, borderColor: on ? C.acc : C.line }}
+                  >
+                    <View style={{ width: 56, height: 34, borderRadius: 17, backgroundColor: t.felt, borderWidth: 4, borderColor: t.rail }} />
+                    <Txt size={12} weight={on ? 'bold' : 'regular'} center>{t.name}</Txt>
+                  </Card>
+                );
+              })}
+            </View>
           </Card>
 
           <Card style={{ gap: 6 }}>

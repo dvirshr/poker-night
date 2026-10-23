@@ -46,6 +46,8 @@ export function heError(e: unknown): string {
     [/name already in use/i, 'השם כבר בשימוש בקבוצה: לחבר להיסטוריה של האורח, או לבחור שם אחר'],
     [/guest cannot be an admin/i, 'אורח בלי חשבון לא יכול להיות מנהל'],
     [/at least one admin/i, 'בקבוצה חייב להישאר לפחות מנהל אחד'],
+    [/cannot unlink yourself/i, 'אי אפשר לנתק את החשבון שלך'],
+    [/banker of an open game/i, 'השחקן הוא הבנקאי של ערב פתוח. קודם להעביר את התפקיד'],
     [/row-level security/i, 'אין הרשאה לפעולה הזו'],
     [/Failed to fetch|Network request failed/i, 'אין חיבור לשרת'],
   ];

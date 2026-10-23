@@ -25,6 +25,7 @@ export default function NewGame() {
   const [banker, setBanker] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -37,6 +38,29 @@ export default function NewGame() {
       setPlayers(list);
       setPicked(list.filter(x => x.profile_id === userId).map(x => x.id));
       setBanker(userId ?? '');
+
+      // same as last time: settings and players of the group's previous game
+      const last = await supabase
+        .from('games')
+        .select('id, name, played_on, buy_in_ils, start_stack_chips, settlement_mode, rebuy_policy, max_rebuys')
+        .eq('group_id', group)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (last.data) {
+        const L = last.data as any;
+        if ([50, 100, 120, 150, 200, 300].includes(L.buy_in_ils)) setBuyIn(L.buy_in_ils);
+        else setCustom(String(L.buy_in_ils));
+        if (L.start_stack_chips && L.start_stack_chips !== L.buy_in_ils * 10) setChipsPerBuyIn(String(L.start_stack_chips));
+        setSettle(L.settlement_mode);
+        setPolicy(L.rebuy_policy === 'none' ? 'none' : 'all_night');
+        setMaxRebuys(L.max_rebuys);
+        const seats = await supabase.from('game_players').select('player_id').eq('game_id', L.id);
+        const ids = new Set((seats.data ?? []).map((r: { player_id: string }) => r.player_id));
+        const again = list.filter(x => ids.has(x.id) || x.profile_id === userId).map(x => x.id);
+        if (again.length) setPicked(again);
+        setCopiedFrom(new Date(L.played_on).toLocaleDateString('he-IL'));
+      }
     })();
   }, [group, userId]);
 
@@ -90,6 +114,11 @@ export default function NewGame() {
     <Screen footer={<Btn title={`פותחים שולחן · ${picked.length === 1 ? 'שחקן אחד' : `${picked.length} שחקנים`}`} onPress={open} disabled={!ok} busy={busy} />}>
       <Back />
       <H1 sub="קאש · כל שחקן נכנס עם הסכום שנקבע">ערב חדש</H1>
+      {copiedFrom && (
+        <Card style={{ marginBottom: 12, paddingVertical: 10 }}>
+          <Txt size={13}>{`↻ מוגדר כמו הערב הקודם (${copiedFrom}): אותם שחקנים, כניסה והגדרות. אפשר לשנות.`}</Txt>
+        </Card>
+      )}
       <ErrorBar text={err} onClose={() => setErr(null)} />
 
       <Field label="שם הערב" value={name} onChangeText={setName} maxLength={40} />

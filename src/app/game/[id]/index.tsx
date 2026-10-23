@@ -151,7 +151,7 @@ export default function Table() {
       <View onLayout={e => setWidth(Math.min(e.nativeEvent.layout.width, 440))} style={{ width: '100%', alignItems: 'center' }}>
         {oval ? (
           <View style={{ width: W, height: H, marginVertical: 8 }}>
-            <View style={{ position: 'absolute', left: W * 0.22, top: H * 0.12, width: W * 0.56, height: H * 0.76, borderRadius: W, backgroundColor: C.felt, borderWidth: 10, borderColor: C.rail, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <View style={{ position: 'absolute', left: W * 0.22, top: H * 0.12, width: W * 0.56, height: H * 0.76, borderRadius: W, backgroundColor: g.felt.felt, borderWidth: 10, borderColor: g.felt.rail, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <Txt muted size={13} center>קופה</Txt>
               <Num size={36} weight="black" color={C.acc} center>{ils(g.pot)}</Num>
               <Txt muted size={12} center>{`${g.totals.reduce((s, t) => s + 1 + t.rebuys, 0)} כניסות`}</Txt>
@@ -160,7 +160,7 @@ export default function Table() {
           </View>
         ) : width > 0 ? (
           <View style={{ width: '100%', gap: 10 }}>
-            <Card style={{ alignItems: 'center', backgroundColor: C.felt }}>
+            <Card style={{ alignItems: 'center', backgroundColor: g.felt.felt }}>
               <Txt muted size={13} center>קופה</Txt>
               <Num size={36} weight="black" color={C.acc} center>{ils(g.pot)}</Num>
             </Card>
@@ -184,6 +184,7 @@ export default function Table() {
       {(g.isBanker || g.isAdmin) && (
         <Btn small kind="ghost" title="העברת תפקיד הבנקאי" style={{ marginTop: 14 }} onPress={() => setHanding(true)} />
       )}
+      <Btn small kind="ghost" title="📜 יומן הערב" style={{ marginTop: 10 }} onPress={() => router.push(`/game/${id}/log`)} />
 
       <PlayerSheet
         open={!!sheet && g.isBanker}

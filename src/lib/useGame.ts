@@ -5,6 +5,7 @@ import { playerTotals, potOf, gapOf, type LedgerEntry, type PlayerTotals } from 
 import { useAuth } from './auth';
 import { useOnResume } from '../ui/kit';
 import { THEMES, type ThemeKey } from './theme';
+import type { Level } from '../core/clock';
 
 export type Game = {
   id: string;
@@ -22,8 +23,12 @@ export type Game = {
   status: 'open' | 'counting' | 'closed';
   banker_profile_id: string;
   closed_at: string | null;
+  payout_pct: number[] | null;
+  clock_anchor: string | null;
+  clock_paused_at: string | null;
+  blinds_rev: number;
 };
-export type Seat = { player_id: string; seat_no: number | null; display_name: string; profile_id: string | null };
+export type Seat = { player_id: string; seat_no: number | null; display_name: string; profile_id: string | null; eliminated_at: string | null; finish_place: number | null };
 export type Row = {
   id: string;
   player_id: string;
@@ -51,14 +56,16 @@ export function useGame(gameId: string) {
   const [loaded, setLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [theme, setTheme] = useState<ThemeKey>('graphite');
+  const [levels, setLevels] = useState<Level[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
-    const [g, gp, le, st] = await Promise.all([
+    const [g, gp, le, st, bl] = await Promise.all([
       supabase.from('games').select('*').eq('id', gameId).single(),
-      supabase.from('game_players').select('player_id, seat_no, players(display_name, profile_id)').eq('game_id', gameId),
+      supabase.from('game_players').select('player_id, seat_no, eliminated_at, finish_place, players(display_name, profile_id)').eq('game_id', gameId),
       supabase.from('ledger_entries').select('*').eq('game_id', gameId).order('created_at'),
       supabase.from('settlements').select('from_player_id, to_player_id, amount_ils, method').eq('game_id', gameId),
+      supabase.from('blind_levels').select('level_no, small_blind, big_blind, duration_min').eq('game_id', gameId).order('level_no'),
     ]);
     const err = g.error ?? gp.error ?? le.error ?? st.error;
     if (err) {
@@ -78,11 +85,15 @@ export function useGame(gameId: string) {
     if (tk && THEMES[tk]) setTheme(tk);
     setSeats(
       (gp.data ?? [])
-        .map((r: any) => ({ player_id: r.player_id, seat_no: r.seat_no, display_name: r.players.display_name, profile_id: r.players.profile_id }))
+        .map((r: any) => ({
+          player_id: r.player_id, seat_no: r.seat_no, display_name: r.players.display_name, profile_id: r.players.profile_id,
+          eliminated_at: r.eliminated_at ?? null, finish_place: r.finish_place ?? null,
+        }))
         .sort((a: Seat, b: Seat) => (a.seat_no ?? 99) - (b.seat_no ?? 99) || a.display_name.localeCompare(b.display_name, 'he')),
     );
     setServer((le.data ?? []) as Row[]);
     setSettlements((st.data ?? []) as Settlement[]);
+    setLevels((bl.data ?? []) as Level[]);
     setLoaded(true);
   }, [gameId, userId]);
 
@@ -172,7 +183,7 @@ export function useGame(gameId: string) {
   const unsynced = queued.length;
 
   return {
-    game, seats, rows, totals, settlements, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[theme],
+    game, seats, rows, totals, settlements, levels, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[theme],
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

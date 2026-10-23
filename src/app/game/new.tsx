@@ -5,6 +5,8 @@ import { supabase, heError } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { C, ils } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Back, tap } from '../../ui/kit';
+import { BlindEditor, PayoutEditor, levelsValid, payoutValid } from '../../ui/tournament';
+import { makeStructure, suggestedPayout, type Level } from '../../core/clock';
 
 type Player = { id: string; display_name: string; profile_id: string | null; role: string };
 const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -26,6 +28,10 @@ export default function NewGame() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
+  const [type, setType] = useState<'cash' | 'tournament'>('cash');
+  const [levels, setLevels] = useState<Level[]>(() => makeStructure(25, 15, 12));
+  const [payout, setPayout] = useState<number[] | null>(null); // null = follow the number of players
+  const [tStack, setTStack] = useState('5000');
 
   useEffect(() => {
     (async () => {
@@ -42,7 +48,7 @@ export default function NewGame() {
       // same as last time: settings and players of the group's previous game
       const last = await supabase
         .from('games')
-        .select('id, name, played_on, buy_in_ils, start_stack_chips, settlement_mode, rebuy_policy, max_rebuys')
+        .select('id, name, played_on, game_type, buy_in_ils, start_stack_chips, settlement_mode, rebuy_policy, max_rebuys')
         .eq('group_id', group)
         .order('created_at', { ascending: false })
         .limit(1)
@@ -51,7 +57,8 @@ export default function NewGame() {
         const L = last.data as any;
         if ([50, 100, 120, 150, 200, 300].includes(L.buy_in_ils)) setBuyIn(L.buy_in_ils);
         else setCustom(String(L.buy_in_ils));
-        if (L.start_stack_chips && L.start_stack_chips !== L.buy_in_ils * 10) setChipsPerBuyIn(String(L.start_stack_chips));
+        setType(L.game_type);
+        if (L.game_type === 'cash' && L.start_stack_chips && L.start_stack_chips !== L.buy_in_ils * 10) setChipsPerBuyIn(String(L.start_stack_chips));
         setSettle(L.settlement_mode);
         setPolicy(L.rebuy_policy === 'none' ? 'none' : 'all_night');
         setMaxRebuys(L.max_rebuys);
@@ -61,14 +68,27 @@ export default function NewGame() {
         if (again.length) setPicked(again);
         setCopiedFrom(new Date(L.played_on).toLocaleDateString('he-IL'));
       }
+      // tournament settings from the group's last tournament (even if the last game was cash)
+      const lt = await supabase.from('games').select('id, start_stack_chips, payout_pct').eq('group_id', group).eq('game_type', 'tournament')
+        .order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (lt.data) {
+        const T = lt.data as { id: string; start_stack_chips: number | null; payout_pct: number[] | null };
+        if (T.start_stack_chips) setTStack(String(T.start_stack_chips));
+        if (T.payout_pct) setPayout(T.payout_pct);
+        const bl = await supabase.from('blind_levels').select('level_no, small_blind, big_blind, duration_min').eq('game_id', T.id).order('level_no');
+        if (bl.data?.length) setLevels(bl.data as Level[]);
+      }
     })();
   }, [group, userId]);
 
   const amount = custom ? parseInt(custom, 10) || 0 : buyIn;
-  const stack = parseInt(chipsPerBuyIn, 10) || amount * 10;
+  const tour = type === 'tournament';
+  const stack = tour ? parseInt(tStack, 10) || 0 : parseInt(chipsPerBuyIn, 10) || amount * 10;
+  const split = payout ?? suggestedPayout(picked.length);
   const quick = useMemo(() => [...new Set([Math.round(amount / 2), amount, amount * 2])].filter(n => n > 0), [amount]);
   const accounts = players.filter(p => p.profile_id);
-  const ok = amount > 0 && picked.length >= 2 && name.trim().length > 0;
+  const ok = amount > 0 && picked.length >= 2 && name.trim().length > 0
+    && (!tour || (stack > 0 && levelsValid(levels) && payoutValid(split, picked.length)));
 
   const toggle = (id: string) => {
     tap();
@@ -83,8 +103,9 @@ export default function NewGame() {
       const g = await supabase
         .from('games')
         .insert({
-          group_id: group, name: name.trim(), buy_in_ils: amount, start_stack_chips: stack, settlement_mode: settle,
-          rebuy_policy: policy, max_rebuys: maxRebuys, quick_rebuys: quick, banker_profile_id: userId,
+          group_id: group, name: name.trim(), game_type: type, buy_in_ils: amount, start_stack_chips: stack, settlement_mode: settle,
+          rebuy_policy: policy, max_rebuys: maxRebuys, quick_rebuys: tour ? [amount] : quick, banker_profile_id: userId,
+          payout_pct: tour ? split : null,
         })
         .select('id')
         .single();
@@ -97,6 +118,11 @@ export default function NewGame() {
       // 3. everyone's first buy-in
       const b = await supabase.from('ledger_entries').insert(ordered.map(p => ({ game_id: gameId, player_id: p.id, type: 'buy_in', amount_ils: amount })));
       if (b.error) throw b.error;
+      // 3b. blind structure (while I am still the banker)
+      if (tour) {
+        const bl = await supabase.from('blind_levels').insert(levels.map((l, i) => ({ game_id: gameId, level_no: i + 1, small_blind: l.small_blind, big_blind: l.big_blind, duration_min: l.duration_min })));
+        if (bl.error) throw bl.error;
+      }
       // 4. hand the bank over if the admin picked someone else
       if (mode === 'admin_assigns' && banker && banker !== userId) {
         const h = await supabase.from('games').update({ banker_profile_id: banker }).eq('id', gameId);
@@ -113,7 +139,8 @@ export default function NewGame() {
   return (
     <Screen footer={<Btn title={`פותחים שולחן · ${picked.length === 1 ? 'שחקן אחד' : `${picked.length} שחקנים`}`} onPress={open} disabled={!ok} busy={busy} />}>
       <Back />
-      <H1 sub="קאש · כל שחקן נכנס עם הסכום שנקבע">ערב חדש</H1>
+      <H1 sub={tour ? 'טורניר · כולם מתחילים עם אותה כמות צ׳יפים, הפרסים לפי מקומות' : 'קאש · כל שחקן נכנס עם הסכום שנקבע'}>ערב חדש</H1>
+      <Seg label="סוג משחק" value={type} onChange={setType} options={[{ v: 'cash', t: '💵 קאש' }, { v: 'tournament', t: '🏆 טורניר' }]} />
       {copiedFrom && (
         <Card style={{ marginBottom: 12, paddingVertical: 10 }}>
           <Txt size={13}>{`↻ מוגדר כמו הערב הקודם (${copiedFrom}): אותם שחקנים, כניסה והגדרות. אפשר לשנות.`}</Txt>
@@ -130,14 +157,20 @@ export default function NewGame() {
         options={[50, 100, 120, 150, 200, 300].map(v => ({ v, t: `${v} ₪` }))}
       />
       <Field label="או סכום אחר (₪)" value={custom} onChangeText={t => setCustom(t.replace(/\D/g, ''))} keyboardType="number-pad" placeholder="למשל 80" />
-      <Field
-        label={`צ׳יפים לכל כניסה (ברירת מחדל ${(amount * 10).toLocaleString('he-IL')})`}
-        value={chipsPerBuyIn}
-        onChangeText={t => setChipsPerBuyIn(t.replace(/\D/g, ''))}
-        keyboardType="number-pad"
-        placeholder={String(amount * 10)}
-      />
-      <Txt muted size={12} style={{ marginTop: -8, marginBottom: 14 }}>{`${stack.toLocaleString('he-IL')} צ׳יפים = ${ils(amount)}`}</Txt>
+      {tour ? (
+        <Field label="צ׳יפים בתחילת הטורניר (וגם בכל ריבאי)" value={tStack} onChangeText={t => setTStack(t.replace(/\D/g, ''))} keyboardType="number-pad" placeholder="5000" />
+      ) : (
+        <>
+          <Field
+            label={`צ׳יפים לכל כניסה (ברירת מחדל ${(amount * 10).toLocaleString('he-IL')})`}
+            value={chipsPerBuyIn}
+            onChangeText={t => setChipsPerBuyIn(t.replace(/\D/g, ''))}
+            keyboardType="number-pad"
+            placeholder={String(amount * 10)}
+          />
+          <Txt muted size={12} style={{ marginTop: -8, marginBottom: 14 }}>{`${stack.toLocaleString('he-IL')} צ׳יפים = ${ils(amount)}`}</Txt>
+        </>
+      )}
 
       <Seg
         label="התחשבנות בסוף"
@@ -148,6 +181,17 @@ export default function NewGame() {
       <Seg label="כניסות חוזרות" value={policy} onChange={setPolicy} options={[{ v: 'all_night', t: 'כל הערב' }, { v: 'none', t: 'בלי' }]} />
       {policy === 'all_night' && (
         <Seg label="מקסימום ריבאיים לשחקן" value={maxRebuys} onChange={setMaxRebuys} options={[3, 4, 5, 6, 7].map(v => ({ v, t: String(v) }))} />
+      )}
+
+      {tour && (
+        <>
+          <Txt weight="bold" size={16} style={{ marginTop: 6, marginBottom: 8 }}>חלוקת פרסים</Txt>
+          <Txt muted size={12} style={{ marginBottom: 8 }}>אפשר לשנות גם בסוף, לפני הסגירה</Txt>
+          <PayoutEditor value={split} onChange={setPayout} players={Math.max(picked.length, 1)} pot={amount * picked.length} />
+          <Txt weight="bold" size={16} style={{ marginTop: 18, marginBottom: 8 }}>מבנה בליינדים</Txt>
+          <BlindEditor levels={levels} onChange={setLevels} />
+          <View style={{ height: 18 }} />
+        </>
       )}
 
       {mode === 'admin_assigns' && accounts.length > 0 && (

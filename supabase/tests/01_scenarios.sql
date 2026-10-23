@@ -388,3 +388,70 @@ select public.approve_member(:'moshe_pend', :'moshe_row');
 reset role;
 select test.ok((select profile_id from public.players where id = :'moshe_row') = '00000000-0000-0000-0000-000000000071', 're-approved and linked correctly');
 select 'WAVE1 TESTS PASSED' as result;
+
+-- ---------- tournament (migration 7) ----------
+select test.ok(public.tournament_prizes(500, array[60,30,10]) = array[300,150,50], 'prizes 60/30/10 of 500');
+select test.ok(public.tournament_prizes(333, array[50,30,20]) = array[166,100,67], 'prizes: largest remainder, whole shekels, sum kept');
+select test.ok(public.tournament_prizes(7, array[34,33,33]) = array[3,2,2], 'prizes: tie in remainder goes to the better place');
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select test.fails($$insert into public.games (group_id, game_type, buy_in_ils, banker_profile_id)
+                    values ('10000000-0000-0000-0000-000000000001', 'tournament', 100, auth.uid())$$,
+                  'tournament_payout', 'tournament needs a payout split');
+insert into public.games (id, group_id, name, game_type, buy_in_ils, start_stack_chips, max_rebuys, payout_pct, settlement_mode, banker_profile_id)
+values ('20000000-0000-0000-0000-0000000000f1', '10000000-0000-0000-0000-000000000001', 'טורניר', 'tournament', 100, 5000, 3, '{50,50}', 'ledger', auth.uid());
+reset role;
+select id as t_avi from public.players where display_name = 'אבי' and group_id = '10000000-0000-0000-0000-000000000001' \gset
+select id as t_ron from public.players where display_name = 'רון' and group_id = '10000000-0000-0000-0000-000000000001' \gset
+select id as t_gal from public.players where display_name = 'גל' and group_id = '10000000-0000-0000-0000-000000000001' \gset
+select id as t_maya from public.players where display_name = 'מאיה' and group_id = '10000000-0000-0000-0000-000000000001' \gset
+set role authenticated;
+insert into public.game_players (game_id, player_id, seat_no) values
+ ('20000000-0000-0000-0000-0000000000f1', :'t_avi', 1), ('20000000-0000-0000-0000-0000000000f1', :'t_ron', 2),
+ ('20000000-0000-0000-0000-0000000000f1', :'t_gal', 3), ('20000000-0000-0000-0000-0000000000f1', :'t_maya', 4);
+insert into public.ledger_entries (game_id, player_id, type, amount_ils)
+select '20000000-0000-0000-0000-0000000000f1', player_id, 'buy_in', 100 from public.game_players where game_id = '20000000-0000-0000-0000-0000000000f1';
+insert into public.ledger_entries (game_id, player_id, type, amount_ils) values ('20000000-0000-0000-0000-0000000000f1', :'t_ron', 'rebuy', 100);
+insert into public.blind_levels (game_id, level_no, small_blind, big_blind, duration_min) values
+ ('20000000-0000-0000-0000-0000000000f1', 1, 25, 50, 15), ('20000000-0000-0000-0000-0000000000f1', 2, 50, 100, 15);
+update public.games set clock_anchor = now(), blinds_rev = blinds_rev + 1 where id = '20000000-0000-0000-0000-0000000000f1';
+select test.ok((select clock_anchor is not null from public.games where id = '20000000-0000-0000-0000-0000000000f1'), 'banker starts the clock');
+update public.game_players set eliminated_at = now() - interval '2 min' where game_id = '20000000-0000-0000-0000-0000000000f1' and player_id = :'t_gal';
+update public.game_players set eliminated_at = now() - interval '1 min' where game_id = '20000000-0000-0000-0000-0000000000f1' and player_id = :'t_ron';
+select test.ok((select count(*) from public.game_players where game_id = '20000000-0000-0000-0000-0000000000f1' and eliminated_at is not null) = 2, 'banker marks eliminations');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);  -- Gal, not the banker
+update public.games set clock_paused_at = now() where id = '20000000-0000-0000-0000-0000000000f1';
+select test.ok((select clock_paused_at is null from public.games where id = '20000000-0000-0000-0000-0000000000f1'), 'a player cannot pause the clock');
+select test.ok((select count(*) from public.blind_levels where game_id = '20000000-0000-0000-0000-0000000000f1') = 2, 'players see the blind structure');
+select test.fails(format($$select public.close_tournament('20000000-0000-0000-0000-0000000000f1', array[%L,%L,%L,%L]::uuid[], '{60,30,10}', '[]')$$, :'t_maya', :'t_avi', :'t_ron', :'t_gal'),
+                  'only the banker', 'only the banker closes a tournament');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select test.fails(format($$select public.close_tournament('20000000-0000-0000-0000-0000000000f1', array[%L,%L,%L]::uuid[], '{60,30,10}', '[]')$$, :'t_maya', :'t_avi', :'t_ron'),
+                  'every player exactly once', 'finish order must contain every player');
+select test.fails(format($$select public.close_tournament('20000000-0000-0000-0000-0000000000f1', array[%L,%L,%L,%L]::uuid[], '{60,30}', '[]')$$, :'t_maya', :'t_avi', :'t_ron', :'t_gal'),
+                  'sum to 100', 'payout must sum to 100');
+select test.fails(format($$select public.close_tournament('20000000-0000-0000-0000-0000000000f1', array[%L,%L,%L,%L]::uuid[], '{60,30,10}', '[]')$$, :'t_maya', :'t_avi', :'t_ron', :'t_gal'),
+                  'do not match the ledger', 'wrong settlements roll back everything');
+select test.ok((select count(*) from public.ledger_entries where game_id = '20000000-0000-0000-0000-0000000000f1' and type = 'cash_out') = 0, 'failed close left no prize rows');
+-- maya 1st (+200), avi 2nd (+50), ron 3rd (50-200 = -150), gal 4th (-100)
+select public.close_tournament('20000000-0000-0000-0000-0000000000f1', array[:'t_maya', :'t_avi', :'t_ron', :'t_gal']::uuid[], '{60,30,10}',
+  jsonb_build_array(
+    jsonb_build_object('from_player_id', :'t_ron', 'to_player_id', :'t_maya', 'amount_ils', 150, 'method', 'transfer'),
+    jsonb_build_object('from_player_id', :'t_gal', 'to_player_id', :'t_maya', 'amount_ils', 50, 'method', 'transfer'),
+    jsonb_build_object('from_player_id', :'t_gal', 'to_player_id', :'t_avi', 'amount_ils', 50, 'method', 'transfer')));
+select test.ok((select status from public.games where id = '20000000-0000-0000-0000-0000000000f1') = 'closed', 'tournament closed');
+select test.ok((select string_agg(display_name || ':' || finish_place || ':' || net, ',' order by finish_place) from public.game_player_totals
+                where game_id = '20000000-0000-0000-0000-0000000000f1') = 'מאיה:1:200,אבי:2:50,רון:3:-150,גל:4:-100', 'places and nets recorded');
+select test.ok((select payout_pct from public.games where id = '20000000-0000-0000-0000-0000000000f1') = '{60,30,10}', 'final payout split recorded');
+select test.fails(format($$update public.game_players set eliminated_at = null where game_id = '20000000-0000-0000-0000-0000000000f1' and player_id = %L$$, :'t_ron'),
+                  'game is closed', 'closed tournament cannot be changed');
+reset role;
+select 'TOURNAMENT TESTS PASSED' as result;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);
+select test.ok((select wins from public.league_by_type where game_type = 'tournament' and display_name = 'מאיה') = 1, 'tournament league: winner by place');
+select test.ok((select count(*) from public.league_by_type where game_type = 'tournament') = 4, 'tournament league has the 4 players');
+reset role;
+select 'LEAGUE BY TYPE PASSED' as result;

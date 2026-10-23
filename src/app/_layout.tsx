@@ -10,6 +10,7 @@ import { flush } from '../lib/queue';
 import { Loading, Screen, Txt, Btn } from '../ui/kit';
 import type { ErrorBoundaryProps } from 'expo-router';
 import { captureInviteFromUrl } from '../lib/invite';
+import { useAlertTaps } from '../lib/alerts';
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.dir = 'rtl';
@@ -21,6 +22,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 function Gate() {
   const { session, ready } = useAuth();
   const seg = useSegments();
+  useAlertTaps(); // tapping a blind alert opens the tournament clock
   useEffect(() => {
     if (!ready) return;
     const inLogin = seg[0] === 'login';

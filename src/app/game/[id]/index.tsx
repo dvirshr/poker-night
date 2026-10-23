@@ -8,6 +8,9 @@ import { useGame, type Row as Entry } from '../../../lib/useGame';
 import { chipsToIls } from '../../../core/settle';
 import { C, ils } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap } from '../../../ui/kit';
+import { ClockBar } from '../../../ui/tournament';
+import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
+import { tournamentPrizes } from '../../../core/settle';
 
 const SEAT_W = 92;
 const SEAT_H = 58;
@@ -30,6 +33,8 @@ export default function Table() {
   const [sheet, setSheet] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [handing, setHanding] = useState(false);
+  const alerts = useAlertPref(id, g.isBanker);
+  useBlindAlertsSync(g.game, g.levels, alerts.on);
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick(x => x + 1), 30000);
@@ -69,20 +74,21 @@ export default function Table() {
     const t = tot(pid);
     const mine = g.mySeat?.player_id === pid;
     const isBankerSeat = s.profile_id === game.banker_profile_id;
+    const gone = t.counted || out(pid);
     return (
       <Pressable
         key={pid}
         disabled={!g.isBanker}
         onPress={() => { tap(); setSheet(pid); }}
         accessibilityLabel={`${s.display_name}, ${ils(t.totalIn)}`}
-        style={[{ width: SEAT_W, height: SEAT_H, borderRadius: 14, backgroundColor: mine ? C.raised : C.surf, borderWidth: mine ? 2.5 : 1.5, borderColor: mine ? C.acc : C.line, alignItems: 'center', justifyContent: 'center', gap: 2, opacity: t.counted ? 0.55 : 1, borderStyle: t.counted ? 'dashed' : 'solid' }, style]}
+        style={[{ width: SEAT_W, height: SEAT_H, borderRadius: 14, backgroundColor: mine ? C.raised : C.surf, borderWidth: mine ? 2.5 : 1.5, borderColor: mine ? C.acc : C.line, alignItems: 'center', justifyContent: 'center', gap: 2, opacity: gone ? 0.55 : 1, borderStyle: gone ? 'dashed' : 'solid' }, style]}
       >
         <Row style={{ gap: 4 }}>
           <Txt weight="bold" size={14}>{s.display_name}</Txt>
           {t.rebuys > 0 && <Badge text={`×${t.rebuys + 1}`} />}
         </Row>
         <Row style={{ gap: 4 }}>
-          <Num muted size={12}>{t.counted ? `יצא · ${ils(t.totalOut)}` : ils(t.totalIn)}</Num>
+          <Num muted size={12}>{out(pid) ? 'בחוץ' : t.counted ? `יצא · ${ils(t.totalOut)}` : ils(t.totalIn)}</Num>
           {mine && <Badge solid text="אני" />}
           {!mine && isBankerSeat && <Badge text="בנקאי" />}
         </Row>
@@ -91,12 +97,28 @@ export default function Table() {
   };
 
   const counting = game.status === 'counting';
+  const tour = game.game_type === 'tournament';
+  const out = (pid: string) => tour && !!g.seats.find(s => s.player_id === pid)?.eliminated_at;
+  const alive = g.seats.filter(s => !s.eliminated_at).length;
+  const split = game.payout_pct ?? [100];
+  const prizes = tour && split.length <= Math.max(n, 1) ? [...tournamentPrizes(g.pot, split, split.map((_, i) => String(i))).values()] : [];
+  const setOut = async (pid: string, v: boolean) => {
+    const { error } = await supabase.from('game_players').update({ eliminated_at: v ? new Date().toISOString() : null }).eq('game_id', id).eq('player_id', pid);
+    if (error) return g.setError(heError(error));
+    setSheet(null);
+    void g.reload();
+  };
 
   return (
     <Screen
       footer={
         g.isBanker ? (
-          counting ? (
+          tour ? (
+            <Row>
+              <Btn title="+ שחקן" kind="ghost" style={{ flex: 1 }} onPress={() => setAdding(true)} />
+              <Btn title="🏆 סיום הטורניר" kind={alive <= 1 ? 'primary' : 'ghost'} style={{ flex: 2 }} disabled={g.unsynced > 0} onPress={() => router.push(`/game/${id}/finish`)} />
+            </Row>
+          ) : counting ? (
             <Btn title="להמשך הספירה" onPress={() => router.push(`/game/${id}/count`)} />
           ) : (
             <Row>
@@ -113,6 +135,8 @@ export default function Table() {
               />
             </Row>
           )
+        ) : tour ? (
+          <Btn title="⏱ שעון הבליינדים" kind="ghost" onPress={() => router.push(`/game/${id}/clock`)} />
         ) : counting ? (
           <Btn title="לצפייה בספירה" kind="ghost" onPress={() => router.push(`/game/${id}/count`)} />
         ) : undefined
@@ -124,13 +148,23 @@ export default function Table() {
         <View style={{ gap: 4, flex: 1 }}>
           <Txt size={26} weight="black">{game.name}</Txt>
           <Txt muted size={13}>
-            {`${game.settlement_mode === 'cash_on_table' ? 'מזומן על השולחן' : 'רישום · ביט'} · כניסה ${ils(game.buy_in_ils)}${game.rebuy_policy === 'none' ? ' · בלי ריבאיים' : ` · עד ${game.max_rebuys} ריבאיים`}`}
+            {`${tour ? '🏆 טורניר · ' : ''}${game.settlement_mode === 'cash_on_table' ? 'מזומן על השולחן' : 'רישום · ביט'} · כניסה ${ils(game.buy_in_ils)}${game.rebuy_policy === 'none' ? ' · בלי ריבאיים' : ` · עד ${game.max_rebuys} ריבאיים`}`}
           </Txt>
           <Txt muted size={13}>{g.isBanker ? 'אתה הבנקאי' : `צפייה · בנקאי: ${g.seats.find(s => s.profile_id === game.banker_profile_id)?.display_name ?? '—'}`}</Txt>
         </View>
         <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} />
       </Row>
       <ErrorBar text={g.error ? heError({ message: g.error }) : null} onClose={() => g.setError(null)} />
+      {tour && <ClockBar game={game} levels={g.levels} />}
+      {tour && (
+        <Card style={{ marginBottom: 8, paddingVertical: 10, gap: 4 }}>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Txt weight="bold">{alive <= 1 && n > 1 ? '🏆 יש מנצח! אפשר לסיים את הטורניר' : `נשארו ${alive} מתוך ${n}`}</Txt>
+            <Txt muted size={12}>{`${split.length} מקומות בפרסים`}</Txt>
+          </Row>
+          {prizes.length > 0 && <Txt muted size={13}>{prizes.map((p, i) => `${['🥇', '🥈', '🥉'][i] ?? `${i + 1}.`} ${ils(p)}`).join('   ')}</Txt>}
+        </Card>
+      )}
       {counting && (
         <Card style={{ marginBottom: 10 }}>
           <Txt weight="bold">הספירה התחילה</Txt>
@@ -175,12 +209,12 @@ export default function Table() {
         <Card accent style={{ marginTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View style={{ gap: 4 }}>
             <Txt muted size={13}>המצב שלי</Txt>
-            <Txt weight="bold" size={17}>{me.counted ? `יצאתי עם ${ils(me.totalOut)} · ${ils(me.net, true)}` : `נכנסתי ${ils(me.totalIn)} · ${me.rebuys + 1} כניסות`}</Txt>
+            <Txt weight="bold" size={17}>{tour ? (out(me.playerId) ? `בחוץ · נכנסתי ${ils(me.totalIn)}` : `במשחק · נכנסתי ${ils(me.totalIn)}`) : me.counted ? `יצאתי עם ${ils(me.totalOut)} · ${ils(me.net, true)}` : `נכנסתי ${ils(me.totalIn)} · ${me.rebuys + 1} כניסות`}</Txt>
           </View>
           {game.rebuy_policy !== 'none' && <Txt muted size={12}>{`נשארו ${Math.max(0, rebuysLeft(me.playerId))} ריבאיים`}</Txt>}
         </Card>
       )}
-      {g.isBanker && !counting && <Txt muted size={12} center style={{ marginTop: 6 }}>הקשה על שחקן: כניסה חוזרת או תיקון</Txt>}
+      {g.isBanker && !counting && <Txt muted size={12} center style={{ marginTop: 6 }}>{tour ? 'הקשה על שחקן: ריבאי, הדחה או תיקון' : 'הקשה על שחקן: כניסה חוזרת או תיקון'}</Txt>}
       {(g.isBanker || g.isAdmin) && (
         <Btn small kind="ghost" title="העברת תפקיד הבנקאי" style={{ marginTop: 14 }} onPress={() => setHanding(true)} />
       )}
@@ -194,8 +228,11 @@ export default function Table() {
         totalIn={sheet ? tot(sheet).totalIn : 0}
         left={sheet ? rebuysLeft(sheet) : 0}
         quick={game.quick_rebuys}
-        canRebuy={!counting && game.rebuy_policy !== 'none' && !(sheet && tot(sheet).counted)}
-        canLeave={!!sheet && !tot(sheet).counted}
+        canRebuy={!counting && game.rebuy_policy !== 'none' && !(sheet && tot(sheet).counted) && !(sheet && out(sheet))}
+        canLeave={!tour && !!sheet && !tot(sheet).counted}
+        tour={tour}
+        isOut={!!sheet && out(sheet)}
+        onOut={v => sheet && setOut(sheet, v)}
         counting={counting}
         buyIn={game.buy_in_ils}
         stack={game.start_stack_chips ?? game.buy_in_ils}
@@ -255,6 +292,7 @@ function PlayerSheet(p: {
   open: boolean; onClose: () => void; name: string; entries: Entry[]; totalIn: number; left: number; quick: number[];
   canRebuy: boolean; onRebuy: (n: number) => void; onReverse: (e: Entry) => void;
   canLeave: boolean; counting: boolean; buyIn: number; stack: number; onLeave: (chips: number) => void;
+  tour: boolean; isOut: boolean; onOut: (v: boolean) => void;
 }) {
   const [other, setOther] = useState('');
   const [leaving, setLeaving] = useState(false);
@@ -288,6 +326,14 @@ function PlayerSheet(p: {
           <Txt color={C.neg}>הגיע למקסימום הריבאיים</Txt>
         )
       ) : null}
+      {p.tour && (
+        p.isOut ? (
+          <Btn small kind="ghost" title="↩ החזרה לטורניר (הודח בטעות)" onPress={() => p.onOut(false)} />
+        ) : (
+          <Btn small kind="danger" title="❌ הודח מהטורניר" onPress={() => p.onOut(true)} />
+        )
+      )}
+      {p.tour && !p.isOut && <Txt muted size={12}>שחקן שעושה ריבאי לא מסמנים כמודח. מקומות נקבעים לפי סדר ההדחה.</Txt>}
       {p.canLeave && (
         leaving ? (
           <Card style={{ gap: 8, borderWidth: 1, borderColor: C.line }}>

@@ -12,8 +12,8 @@ import { THEMES, type ThemeKey } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
-type Game = { id: string; name: string; status: string; played_on: string };
-type League = { player_id: string; display_name: string; games_played: number; net_total: number; net_avg: number; wins: number };
+type Game = { id: string; name: string; status: string; played_on: string; game_type?: string };
+type League = { player_id: string; display_name: string; games_played: number; net_total: number; net_avg: number; wins: number; game_type?: string; podiums?: number };
 
 export default function Group() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,6 +22,8 @@ export default function Group() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [league, setLeague] = useState<League[]>([]);
+  const [byType, setByType] = useState<League[]>([]);
+  const [kind, setKind] = useState<'all' | 'cash' | 'tournament'>('all');
   const [tab, setTab] = useState<'league' | 'month' | 'history' | 'members' | 'settings'>('league');
   const [editing, setEditing] = useState<string | null>(null);
   const [rename, setRename] = useState('');
@@ -35,9 +37,12 @@ export default function Group() {
     const [g, p, gm, l] = await Promise.all([
       supabase.from('groups').select('*').eq('id', id).single(),
       supabase.from('players').select('id, display_name, role, status, is_guest, profile_id').eq('group_id', id).order('display_name'),
-      supabase.from('games').select('id, name, status, played_on').eq('group_id', id).order('created_at', { ascending: false }),
+      supabase.from('games').select('*').eq('group_id', id).order('created_at', { ascending: false }),
       supabase.from('league_table').select('*').eq('group_id', id).order('net_total', { ascending: false }),
     ]);
+    // split by game type (needs the tournament update; without it the overall table still works)
+    const bt = await supabase.from('league_by_type').select('*').eq('group_id', id).order('net_total', { ascending: false });
+    setByType(bt.error ? [] : ((bt.data ?? []) as League[]));
     if (g.error) return setErr(heError(g.error));
     setGroup(g.data);
     setPlayers((p.data ?? []) as Player[]);
@@ -168,19 +173,24 @@ export default function Group() {
 
       {tab === 'league' && (
         <View style={{ gap: 6 }}>
+          {new Set(byType.map(l => l.game_type)).size > 1 && (
+            <Seg value={kind} onChange={setKind} options={[{ v: 'all', t: 'הכל' }, { v: 'cash', t: '💵 קאש' }, { v: 'tournament', t: '🏆 טורנירים' }]} />
+          )}
           {league.length === 0 && <Txt muted>הטבלה תתמלא אחרי הערב הראשון שנסגר</Txt>}
           {stats.titles.size > 0 && (
             <Txt muted size={12} style={{ marginBottom: 4 }}>
               {[...new Map([...stats.titles.values()].flat().map(t => [t.key, t])).values()].map(t => `${t.emoji} ${t.label}`).join(' · ')}
             </Txt>
           )}
-          {league.map((l, i) => (
+          {(kind === 'all' ? league : byType.filter(l => l.game_type === kind)).map((l, i) => (
             <Card key={l.player_id} onPress={() => router.push(`/player/${id}/${l.player_id}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
               <Row>
                 <Num weight="black" size={16} color={C.muted}>{i + 1}</Num>
                 <View>
                   <Txt weight="bold">{`${l.display_name} ${titleBadges(stats.titles.get(l.player_id))}`}</Txt>
-                  <Txt muted size={12}>{`${l.games_played} ערבים · ${l.wins} נצחונות · ממוצע ${ils(l.net_avg, true)}`}</Txt>
+                  <Txt muted size={12}>{kind === 'tournament'
+                    ? `${l.games_played} טורנירים · ${l.wins} 🏆 · ${l.podiums ?? 0} פודיומים`
+                    : `${l.games_played} ערבים · ${l.wins} נצחונות · ממוצע ${ils(l.net_avg, true)}`}</Txt>
                 </View>
               </Row>
               <Num weight="black" size={18} color={l.net_total > 0 ? C.pos : l.net_total < 0 ? C.neg : C.muted}>{ils(l.net_total, true)}</Num>
@@ -218,7 +228,7 @@ export default function Group() {
             .filter(g => g.status === 'closed')
             .map(g => (
               <Card key={g.id} onPress={() => router.push(`/game/${g.id}/summary`)}>
-                <Txt weight="bold">{g.name}</Txt>
+                <Txt weight="bold">{`${g.game_type === 'tournament' ? '🏆 ' : ''}${g.name}`}</Txt>
                 <Txt muted size={12}>{new Date(g.played_on).toLocaleDateString('he-IL')}</Txt>
               </Card>
             ))}

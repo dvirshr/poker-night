@@ -19,7 +19,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.dvirshr.pokernight",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./public/favicon.png",
@@ -41,6 +47,13 @@
         "expo-localization",
         {
           "forcesRTL": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#F5A524"
         }
       ]
     ],

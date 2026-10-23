@@ -41,3 +41,7 @@ export const THEMES: Record<ThemeKey, { name: string; felt: string; rail: string
   vegas: { name: 'וגאס', felt: '#6E1F2A', rail: '#2B1A12' },
   ocean: { name: 'ים', felt: '#17435E', rail: '#2E3B47' },
 };
+
+/** Keeps "50 / 100" in reading order inside Hebrew text (otherwise it shows as "100 / 50"). */
+export const ltr = (t: string) => `\u2066${t}\u2069`;
+export const blinds = (sb: number, bb: number) => ltr(`${sb.toLocaleString('he-IL')} / ${bb.toLocaleString('he-IL')}`);

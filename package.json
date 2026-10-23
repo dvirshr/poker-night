@@ -14,6 +14,7 @@
     "expo-keep-awake": "~58.0.3",
     "expo-linking": "~58.0.13",
     "expo-localization": "~58.0.4",
+    "expo-notifications": "~58.1.5",
     "expo-router": "~58.0.22",
     "expo-sqlite": "~58.0.13",
     "expo-status-bar": "~58.0.3",
@@ -33,7 +34,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "node --experimental-strip-types --no-warnings --test src/core/settle.test.ts src/core/stats.test.ts",
+    "test": "node --experimental-strip-types --no-warnings --test src/core/settle.test.ts src/core/stats.test.ts src/core/clock.test.ts",
     "test:db": "./run_db_tests.sh",
     "typecheck": "tsc --noEmit",
     "export:web": "expo export --platform web"

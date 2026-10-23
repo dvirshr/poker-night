@@ -88,10 +88,10 @@ export function largestRemainder(total: number, weights: { key: string; weight: 
   const out = new Map<string, number>();
   if (weights.length === 0) return out;
   if (sumW <= 0) throw new Error('weights must sum to a positive number');
+  // integer remainders (not float fractions): the server computes prizes the same way, so both always agree
   const rows = weights.map(w => {
-    const exact = (total * w.weight) / sumW;
-    const base = Math.floor(exact);
-    return { key: w.key, base, rem: exact - base };
+    const base = Math.floor((total * w.weight) / sumW);
+    return { key: w.key, base, rem: total * w.weight - base * sumW };
   });
   let left = total - rows.reduce((s, r) => s + r.base, 0);
   const order = [...rows].sort((a, b) => b.rem - a.rem || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));

@@ -30,6 +30,10 @@ export default function Summary() {
 
   const game = g.game;
   const closed = game?.status === 'closed';
+  const tour = game?.game_type === 'tournament';
+  useEffect(() => {
+    if (tour && !closed) router.replace(`/game/${id}/finish`); // an open tournament closes from the finish screen
+  }, [tour, closed, id]);
   useEffect(() => {
     if (closed && !wasCelebrated(id)) {
       markCelebrated(id);
@@ -38,7 +42,11 @@ export default function Summary() {
   }, [closed, id]);
 
   const nameOf = (pid: string | null) => g.seats.find(s => s.player_id === pid)?.display_name ?? '';
-  const ranked = useMemo(() => [...g.totals].sort((a, b) => b.net - a.net || nameOf(a.playerId).localeCompare(nameOf(b.playerId), 'he')), [g.totals, g.seats]); // eslint-disable-line react-hooks/exhaustive-deps
+  const placeOf = (pid: string) => g.seats.find(s => s.player_id === pid)?.finish_place ?? 99;
+  const ranked = useMemo(
+    () => [...g.totals].sort((a, b) => (tour ? placeOf(a.playerId) - placeOf(b.playerId) : 0) || b.net - a.net || nameOf(a.playerId).localeCompare(nameOf(b.playerId), 'he')),
+    [g.totals, g.seats, tour], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const allCounted = g.totals.length > 0 && g.totals.every(t => t.counted);
 
   // settlements: from the server once closed, otherwise the preview the close will write
@@ -52,14 +60,14 @@ export default function Summary() {
 
   if (!g.loaded || !game) return <Loading />;
   const cash = game.settlement_mode === 'cash_on_table';
-  const podium = ranked.filter(t => t.net > 0).slice(0, 3);
+  const podium = (tour ? ranked.filter(t => t.totalOut > 0) : ranked.filter(t => t.net > 0)).slice(0, 3);
   const rest = ranked.filter(t => !podium.includes(t));
   const mine = g.mySeat?.player_id;
 
   const shareText = () => {
-    const lines = [`🃏 סגירת חשבון – ${game.name}`, `קופה: ${ils(g.pot)}`, ''];
-    podium.forEach((t, i) => lines.push(`${['🥇', '🥈', '🥉'][i]} ${nameOf(t.playerId)} ${ils(t.net, true)}`));
-    rest.forEach(t => lines.push(`• ${nameOf(t.playerId)} ${ils(t.net, true)}`));
+    const lines = [`${tour ? '🏆 טורניר' : '🃏 סגירת חשבון'} – ${game.name}`, `קופה: ${ils(g.pot)}`, ''];
+    podium.forEach((t, i) => lines.push(`${['🥇', '🥈', '🥉'][i]} ${nameOf(t.playerId)} ${tour ? `פרס ${ils(t.totalOut)} (${ils(t.net, true)})` : ils(t.net, true)}`));
+    rest.forEach(t => lines.push(`• ${tour ? `${placeOf(t.playerId)}. ` : ''}${nameOf(t.playerId)} ${ils(t.net, true)}`));
     lines.push('', cash ? 'חלוקת הקופה:' : 'העברות:');
     plan.forEach(s => lines.push(cash ? `• ${nameOf(s.to_player_id)} לוקח ${ils(s.amount_ils)}` : `• ${nameOf(s.from_player_id)} ← ${nameOf(s.to_player_id)}: ${ils(s.amount_ils)}`));
     return lines.join('\n');
@@ -109,7 +117,7 @@ export default function Summary() {
         <Back label={closed ? 'הקבוצה' : 'לספירה'} to={closed ? `/group/${game.group_id}` : `/game/${id}/count`} />
         {!closed ? <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} /> : <RefreshBtn onPress={g.reload} />}
       </Row>
-      <Txt size={26} weight="black">{cash ? 'חלוקת הקופה' : 'סגירת חשבון'}</Txt>
+      <Txt size={26} weight="black">{tour ? '🏆 תוצאות הטורניר' : cash ? 'חלוקת הקופה' : 'סגירת חשבון'}</Txt>
       <Row style={{ marginTop: 4, marginBottom: 12 }}>
         <Txt muted size={13}>{`${game.name} · קופה ${ils(g.pot)} · `}</Txt>
         {g.gap === 0 && allCounted ? <Txt size={13} color={C.pos}>✓ מאוזנת</Txt> : <Txt size={13} color={C.neg}>לא מאוזנת</Txt>}
@@ -148,7 +156,8 @@ export default function Summary() {
                 return (
                   <View key={i} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
                     <Txt weight="bold" center>{nameOf(t.playerId)}{t.playerId === mine ? ' · אני' : ''}</Txt>
-                    <Num weight="black" color={C.pos} center>{ils(t.net, true)}</Num>
+                    {tour && <Num weight="black" color={C.acc} center>{ils(t.totalOut)}</Num>}
+                    <Num weight={tour ? 'regular' : 'black'} size={tour ? 12 : 15} color={t.net >= 0 ? C.pos : C.neg} center>{ils(t.net, true)}</Num>
                     <View style={{ width: '100%', height: h, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: medal(i + 1), alignItems: 'center', justifyContent: 'center' }}>
                       <Txt size={24} weight="black" color={C.accInk} center>{String(i + 1)}</Txt>
                     </View>
@@ -160,7 +169,7 @@ export default function Summary() {
           <View style={{ paddingVertical: 8 }}>
             {rest.map(t => (
               <Row key={t.playerId} style={{ justifyContent: 'space-between', paddingVertical: 4 }}>
-                <Txt>{nameOf(t.playerId)}{t.playerId === mine ? ' · אני' : ''}</Txt>
+                <Txt>{tour ? `${placeOf(t.playerId)}. ` : ''}{nameOf(t.playerId)}{t.playerId === mine ? ' · אני' : ''}</Txt>
                 <Num weight="bold" color={t.net < 0 ? C.neg : C.muted}>{ils(t.net, true)}</Num>
               </Row>
             ))}

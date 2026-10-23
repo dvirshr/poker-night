@@ -22,13 +22,13 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04   # pinned: the Android SDK is preinstalled on this image
     timeout-minutes: 60
     env:
       EXPO_PUBLIC_SUPABASE_URL: https://esfubeqfacuyrjylhjmc.supabase.co
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable__h1qDYFh1_eRLb_ZrKg4-Q_6ONxptOZ
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Check signing secrets
         env:
@@ -40,17 +40,23 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK (preinstalled on the runner)
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -d "$ANDROID_HOME" || { echo "::error::Android SDK not found on runner"; exit 1; }
+          SDKM=$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | head -1)
+          [ -n "$SDKM" ] && (yes | "$SDKM" --licenses > /dev/null) || true
+          ls "$ANDROID_HOME/build-tools" | tail -3
 
       - name: Install
         run: npm ci

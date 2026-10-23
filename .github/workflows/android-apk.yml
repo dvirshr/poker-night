@@ -7,11 +7,10 @@
 # The same keystore must sign every version, otherwise phones refuse to update.
 name: Android APK
 
+# Built only on request (Actions → Android APK → Run workflow), so friends install a new APK
+# about once a month instead of on every change. The website still updates on every push.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['src/**', 'app.json', 'package.json', 'assets/**', '.github/workflows/android-apk.yml']
 
 permissions:
   contents: write

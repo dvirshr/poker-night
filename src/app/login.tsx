@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { pendingInvite } from '../lib/invite';
 import { supabase, heError } from '../lib/supabase';
 import { C } from '../lib/theme';
@@ -58,6 +58,7 @@ export default function Login() {
       <View style={{ height: 16 }} />
       <Txt muted size={12} center>מבקשים רק שם, מייל וסיסמה. אין פרטי תשלום ואין גישה לשום דבר בטלפון.</Txt>
       <Txt muted size={12} center>עדיף סיסמה חדשה, לא זו של הבנק או המייל. מתחברים פעם אחת.</Txt>
+      <Btn small kind="ghost" title="❓ איך זה עובד" style={{ marginTop: 8 }} onPress={() => router.push('/help')} />
     </Screen>
   );
 }

@@ -99,6 +99,7 @@ export default function Home() {
         <H1 sub={me ? `שלום ${me}` : undefined}>ערב פוקר</H1>
         <Row>
           <RefreshBtn onPress={load} />
+          <Btn title="❓" kind="ghost" small style={{ paddingHorizontal: 12 }} onPress={() => router.push('/help')} />
           <Btn title="יציאה" kind="ghost" small style={{ paddingHorizontal: 14 }} onPress={() => supabase.auth.signOut()} />
         </Row>
       </Row>

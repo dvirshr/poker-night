@@ -26,7 +26,7 @@ function Gate() {
   useEffect(() => {
     if (!ready) return;
     const inLogin = seg[0] === 'login';
-    const isPublic = inLogin || seg[0] === 'join';
+    const isPublic = inLogin || seg[0] === 'join' || seg[0] === 'help';
     if (!session && !isPublic) router.replace('/login');
     if (session && inLogin) router.replace('/');
     if (session) void flush(); // send anything left on the phone from last time

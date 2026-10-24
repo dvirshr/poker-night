@@ -37,6 +37,8 @@ export function heError(e: unknown): string {
     [/game is closed/i, 'הערב סגור ולא ניתן לשינוי'],
     [/pot is not balanced/i, 'הקופה לא מאוזנת'],
     [/every player must be counted/i, 'צריך לספור את כל השחקנים'],
+    [/only the banker can draw/i, 'רק הבנקאי יכול להגריל'],
+    [/at least 2 players at the table to draw/i, 'צריך לפחות 2 שחקנים בשולחן להגרלה'],
     [/only the banker or a group admin/i, 'רק הבנקאי או מנהל הקבוצה יכולים להעביר את התפקיד'],
     [/only the banker/i, 'רק הבנקאי יכול לעשות את זה'],
     [/only a group admin/i, 'רק מנהל הקבוצה יכול לעשות את זה'],

@@ -9,6 +9,7 @@ import { chipsToIls } from '../../../core/settle';
 import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap } from '../../../ui/kit';
 import { ClockBar } from '../../../ui/tournament';
+import { DealerDraw } from '../../../ui/DealerDraw';
 import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
 import { tournamentPrizes } from '../../../core/settle';
 
@@ -156,6 +157,7 @@ export default function Table() {
         <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} />
       </Row>
       <ErrorBar text={g.error ? heError({ message: g.error }) : null} onClose={() => g.setError(null)} />
+      <DealerDraw gameId={id} draws={g.draws} seats={g.seats} isBanker={g.isBanker} open={game.status === 'open'} onError={m => g.setError(m)} onDrawn={() => void g.reload()} />
       {tour && <ClockBar game={game} levels={g.levels} />}
       {tour && (
         <Card style={{ marginBottom: 8, paddingVertical: 10, gap: 4 }}>

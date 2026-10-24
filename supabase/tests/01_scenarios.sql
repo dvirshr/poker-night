@@ -455,3 +455,32 @@ select test.ok((select wins from public.league_by_type where game_type = 'tourna
 select test.ok((select count(*) from public.league_by_type where game_type = 'tournament') = 4, 'tournament league has the 4 players');
 reset role;
 select 'LEAGUE BY TYPE PASSED' as result;
+
+-- ---------- dealer draw (migration 8) ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.games (id, group_id, name, buy_in_ils, start_stack_chips, banker_profile_id)
+values ('20000000-0000-0000-0000-0000000000d1', '10000000-0000-0000-0000-000000000001', 'ערב הגרלה', 100, 1000, auth.uid());
+insert into public.game_players (game_id, player_id, seat_no) values
+ ('20000000-0000-0000-0000-0000000000d1', :'t_avi', 1), ('20000000-0000-0000-0000-0000000000d1', :'t_ron', 2),
+ ('20000000-0000-0000-0000-0000000000d1', :'t_gal', 3), ('20000000-0000-0000-0000-0000000000d1', :'t_maya', 4);
+select public.draw_dealer('20000000-0000-0000-0000-0000000000d1');
+select test.ok((select count(*) from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1') = 1, 'banker draws a dealer, the draw is recorded');
+select public.draw_dealer('20000000-0000-0000-0000-0000000000d1');
+select test.ok((select max(draw_no) from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1') = 2, 'a redraw is a new numbered row, the first one stays');
+select test.fails($$insert into public.game_draws (game_id, player_id, draw_no, pool) values ('20000000-0000-0000-0000-0000000000d1', (select player_id from public.game_players where game_id = '20000000-0000-0000-0000-0000000000d1' limit 1), 9, 4)$$,
+                  'permission denied', 'nobody writes a draw by hand');
+select test.fails($$delete from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1'$$, 'permission denied', 'draws cannot be deleted');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);  -- Gal
+select test.fails($$select public.draw_dealer('20000000-0000-0000-0000-0000000000d1')$$, 'only the banker', 'only the banker can draw');
+select test.ok((select count(*) from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1') = 2, 'players see the draws');
+-- fairness: 2,000 draws over 4 players, each should land near 500
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+do $$ begin
+  for i in 1..2000 loop perform public.draw_dealer('20000000-0000-0000-0000-0000000000d1'); end loop;
+end $$;
+select test.ok((select min(c) > 420 and max(c) < 580 from (select count(*) c from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1' group by player_id) x),
+               'draw is uniform: each of 4 players got 420..580 of 2,002 draws');
+select player_id, count(*) from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1' group by player_id;
+select 'DRAW TESTS PASSED' as result;

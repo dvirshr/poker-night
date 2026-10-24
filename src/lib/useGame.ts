@@ -43,6 +43,7 @@ export type Row = {
 };
 export type Settlement = { from_player_id: string | null; to_player_id: string; amount_ils: number; method: 'from_pot' | 'transfer' };
 export type Live = 'live' | 'reconnecting';
+export type Draw = { id: string; player_id: string; draw_no: number; pool: number; drawn_at: string };
 
 export function useGame(gameId: string) {
   const { userId } = useAuth();
@@ -59,6 +60,7 @@ export function useGame(gameId: string) {
   const [myTheme, setMine] = useState<ThemeKey | null>(() => getMyTheme());
   const chooseTheme = useCallback((v: ThemeKey | null) => { setMyTheme(v); setMine(v); }, []);
   const [levels, setLevels] = useState<Level[]>([]);
+  const [draws, setDraws] = useState<Draw[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -96,6 +98,9 @@ export function useGame(gameId: string) {
     setServer((le.data ?? []) as Row[]);
     setSettlements((st.data ?? []) as Settlement[]);
     setLevels((bl.data ?? []) as Level[]);
+    // dealer draws (missing table before the update = no draws, never an error)
+    const dr = await supabase.from('game_draws').select('id, player_id, draw_no, pool, drawn_at').eq('game_id', gameId).order('draw_no');
+    setDraws(dr.error ? [] : ((dr.data ?? []) as Draw[]));
     setLoaded(true);
   }, [gameId, userId]);
 
@@ -115,6 +120,9 @@ export function useGame(gameId: string) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, reload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, reload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'settlements', filter: `game_id=eq.${gameId}` }, reload)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_draws', filter: `game_id=eq.${gameId}` }, p => {
+        setDraws(d => (d.some(x => x.id === (p.new as Draw).id) ? d : [...d, p.new as Draw].sort((a, b) => a.draw_no - b.draw_no)));
+      })
       .subscribe(status => {
         if (status === 'SUBSCRIBED') {
           setLive('live');
@@ -185,7 +193,7 @@ export function useGame(gameId: string) {
   const unsynced = queued.length;
 
   return {
-    game, seats, rows, totals, settlements, levels, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
+    game, seats, rows, totals, settlements, levels, draws, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

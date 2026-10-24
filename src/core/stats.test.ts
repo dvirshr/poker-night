@@ -106,3 +106,25 @@ test('head to head: only shared nights, places in tournaments', () => {
   assert.deepEqual([ron.nights, ron.myNet, ron.otherNet, ron.meAhead, ron.otherAhead], [2, -50, -150, 1, 1]);
   assert.deepEqual(h.map(x => x.otherId), ['ron', 'maya']);
 });
+
+import { periods } from './stats.ts';
+
+test('periods: month and calendar year, #1 by money and by wins (ties shared)', () => {
+  const ns: Night[] = [
+    n('a1', '2026-01-10', 'maya', 300), n('a1', '2026-01-10', 'ron', -300),
+    n('a2', '2026-01-17', 'ron', 50), n('a2', '2026-01-17', 'maya', -50),
+    n('a3', '2026-01-24', 'ron', 40), n('a3', '2026-01-24', 'maya', -40),
+    n('b1', '2025-12-20', 'gal', 10), n('b1', '2025-12-20', 'ron', -10),
+  ];
+  const y = periods(ns, [], 'year');
+  assert.deepEqual(y.map(p => p.key), ['2026', '2025']);
+  // 2026: money -> maya (+210), wins -> ron (2 of 3)
+  assert.deepEqual(y[0].moneyKing.map(s => s.playerId), ['maya']);
+  assert.deepEqual(y[0].winsKing.map(s => [s.playerId, s.wins]), [['ron', 2]]);
+  const m = periods(ns, [], 'month');
+  assert.equal(m[0].key, '2026-01');
+  // tie on wins in a month: both kings
+  const tie = periods([n('c1', '2026-03-01', 'x', 10), n('c1', '2026-03-01', 'y', -10), n('c2', '2026-03-08', 'y', 30), n('c2', '2026-03-08', 'x', -30)], [], 'month');
+  assert.deepEqual(tie[0].winsKing.map(s => s.playerId), ['y', 'x']); // y first: more money
+  assert.deepEqual(tie[0].moneyKing.map(s => s.playerId), ['y']);
+});

@@ -4,10 +4,10 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { supabase, heError } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
-import { C, ils } from '../../lib/theme';
+import { C, ils, medal } from '../../lib/theme';
 import { inviteLink, inviteMessage } from '../../lib/invite';
 import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
-import { monthly, monthName, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
+import { monthName, periods, byKind, type Standing, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
 import { THEMES, type ThemeKey } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
 
@@ -25,6 +25,7 @@ export default function Group() {
   const [kind, setKind] = useState<'all' | 'cash' | 'tournament'>('all');
   const [sort, setSort] = useState<LeagueSort>('total');
   const [mineOnly, setMineOnly] = useState(false);
+  const [period, setPeriod] = useState<'month' | 'year'>('month');
   const [tab, setTab] = useState<'league' | 'month' | 'history' | 'members' | 'settings'>('league');
   const [editing, setEditing] = useState<string | null>(null);
   const [rename, setRename] = useState('');
@@ -162,7 +163,7 @@ export default function Group() {
         onChange={setTab}
         options={[
           { v: 'league', t: 'טבלת ליגה' },
-          { v: 'month', t: 'חודשי' },
+          { v: 'month', t: 'חודשי ושנתי' },
           { v: 'history', t: 'היסטוריה' },
           { v: 'members', t: 'שחקנים' },
           ...(isAdmin ? [{ v: 'settings' as const, t: 'הגדרות' }] : []),
@@ -215,27 +216,75 @@ export default function Group() {
         );
       })()}
 
-      {tab === 'month' && (
-        <View style={{ gap: 8 }}>
-          {monthly(stats.nights, stats.transfers).length === 0 && <Txt muted>הסיכום יופיע אחרי הערב הראשון שנסגר</Txt>}
-          {monthly(stats.nights, stats.transfers).map(m => {
-            const lines = [
-              `🃏 ${group?.name ?? ''} · ${monthName(m.month)}`,
-              `${m.nights} ערבים · ${m.players} שחקנים · ${ils(m.pot)} עברו בקופה`,
-              m.king ? `👑 מלך החודש: ${m.king.name} ${ils(m.king.net, true)}` : '',
-              m.bestNight ? `🚀 הערב הכי טוב: ${m.bestNight.name} ${ils(m.bestNight.net, true)} (${new Date(m.bestNight.playedOn).toLocaleDateString('he-IL')})` : '',
-              m.biggestTransfer ? `💸 ההעברה הכי גדולה: ${m.biggestTransfer.from} ← ${m.biggestTransfer.to} ${ils(m.biggestTransfer.amountIls)}` : '',
-            ].filter(Boolean);
-            return (
-              <Card key={m.month} style={{ gap: 6 }}>
-                <Txt weight="black" size={18}>{monthName(m.month)}</Txt>
-                {lines.slice(1).map((l, i) => <Txt key={i} size={14}>{l}</Txt>)}
-                <Btn small kind="ghost" title="שיתוף הסיכום" style={{ marginTop: 6 }} onPress={() => Share.share({ message: lines.join('\n') })} />
-              </Card>
-            );
-          })}
-        </View>
-      )}
+      {tab === 'month' && (() => {
+        const list = periods(byKind(stats.nights, kind), stats.transfers, period);
+        const names = (l: Standing[]) => l.map(x => x.name).join(' + ');
+        const tie = (l: Standing[]) => (l.length > 1 ? ' (שוויון)' : '');
+        const title = (k: string) => (period === 'month' ? monthName(k) : `שנת ${k}`);
+        const unit = kind === 'tournament' ? 'טורנירים' : 'ערבים';
+        return (
+          <View style={{ gap: 8 }}>
+            <Seg value={period} onChange={setPeriod} options={[{ v: 'month', t: 'חודשי' }, { v: 'year', t: 'שנתי' }]} />
+            <Seg value={kind} onChange={setKind} options={[{ v: 'all', t: 'הכל' }, { v: 'cash', t: '💵 קאש' }, { v: 'tournament', t: '🏆 טורנירים' }]} />
+            {list.length === 0 && <Txt muted>הסיכום יופיע אחרי הערב הראשון שנסגר</Txt>}
+            {list.map(m => {
+              const extras = [
+                m.bestNight ? `🚀 הערב הכי טוב: ${m.bestNight.name} ${ils(m.bestNight.net, true)} (${new Date(m.bestNight.playedOn).toLocaleDateString('he-IL')})` : '',
+                m.biggestTransfer ? `💸 ההעברה הכי גדולה: ${m.biggestTransfer.from} ← ${m.biggestTransfer.to} ${ils(m.biggestTransfer.amountIls)}` : '',
+              ].filter(Boolean);
+              const statLine = `${m.nights} ${unit} · ${m.players} שחקנים · ${ils(m.pot)} עברו בקופה`;
+              const lines = [
+                `🃏 ${group?.name ?? ''} · ${title(m.key)}${kind === 'cash' ? ' · קאש' : kind === 'tournament' ? ' · טורנירים' : ''}`,
+                statLine,
+                ...(period === 'year'
+                  ? [
+                      m.byWins.length ? `🏆 נצחונות: ${m.byWins.map((r, i) => `${['🥇', '🥈', '🥉'][i]} ${r.name} ${r.wins}`).join('  ')}` : '',
+                      m.byMoney.length ? `💰 כסף: ${m.byMoney.map((r, i) => `${['🥇', '🥈', '🥉'][i]} ${r.name} ${ils(r.net, true)}`).join('  ')}` : '',
+                    ]
+                  : [
+                      m.winsKing.length ? `🏆 מנצח החודש: ${names(m.winsKing)} · ${m.winsKing[0].wins} נצחונות${tie(m.winsKing)}` : '',
+                      m.moneyKing.length ? `💰 מלך הכסף: ${names(m.moneyKing)} ${ils(m.moneyKing[0].net, true)}${tie(m.moneyKing)}` : '',
+                    ]),
+                ...extras,
+              ].filter(Boolean);
+              const podium = (label: string, rows: Standing[], value: (r: Standing) => string) => (
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Txt muted size={12}>{label}</Txt>
+                  {rows.map((r, i) => (
+                    <Row key={r.playerId} style={{ gap: 6 }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: medal(i + 1), alignItems: 'center', justifyContent: 'center' }}>
+                        <Txt size={11} weight="black" color={C.accInk} center>{String(i + 1)}</Txt>
+                      </View>
+                      <Txt size={14} weight={i === 0 ? 'bold' : 'regular'} style={{ flexShrink: 1 }}>{r.name}</Txt>
+                      <Num size={13} muted>{value(r)}</Num>
+                    </Row>
+                  ))}
+                  {rows.length === 0 && <Txt muted size={13}>—</Txt>}
+                </View>
+              );
+              return (
+                <Card key={m.key} style={{ gap: 8 }}>
+                  <Txt weight="black" size={18}>{title(m.key)}</Txt>
+                  <Txt muted size={13}>{statLine}</Txt>
+                  {period === 'year' ? (
+                    <Row style={{ alignItems: 'flex-start', gap: 12 }}>
+                      {podium('🏆 נצחונות', m.byWins, r => String(r.wins))}
+                      {podium('💰 כסף', m.byMoney, r => ils(r.net, true))}
+                    </Row>
+                  ) : (
+                    <View style={{ gap: 4 }}>
+                      <Txt size={14}>{m.winsKing.length ? `🏆 מנצח החודש: ` : '🏆 אין מנצח החודש'}<Txt size={14} weight="bold">{names(m.winsKing)}</Txt>{m.winsKing.length ? ` · ${m.winsKing[0].wins} נצחונות${tie(m.winsKing)}` : ''}</Txt>
+                      <Txt size={14}>{m.moneyKing.length ? `💰 מלך הכסף: ` : '💰 אף אחד לא ברווח'}<Txt size={14} weight="bold">{names(m.moneyKing)}</Txt>{m.moneyKing.length ? ` ${ils(m.moneyKing[0].net, true)}${tie(m.moneyKing)}` : ''}</Txt>
+                    </View>
+                  )}
+                  {extras.map((l, i) => <Txt key={i} size={13} muted>{l}</Txt>)}
+                  <Btn small kind="ghost" title="שיתוף הסיכום" style={{ marginTop: 4 }} onPress={() => Share.share({ message: lines.join('\n') })} />
+                </Card>
+              );
+            })}
+          </View>
+        );
+      })()}
 
       {tab === 'history' && (
         <View style={{ gap: 6 }}>

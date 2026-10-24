@@ -262,3 +262,65 @@ export function headToHead(nights: Night[], me: string): HeadToHead[] {
   }
   return [...out.values()].sort((a, b) => b.nights - a.nights || a.otherName.localeCompare(b.otherName, 'he'));
 }
+
+// ---------- month / calendar year ----------
+export interface Standing { playerId: string; name: string; net: number; wins: number; nights: number }
+export interface PeriodSummary {
+  key: string; // YYYY-MM or YYYY
+  nights: number;
+  players: number;
+  pot: number;
+  /** #1 by money and #1 by wins; several names on a tie; empty when nobody is positive / nobody won */
+  moneyKing: Standing[];
+  winsKing: Standing[];
+  /** top 3 of each, for the yearly view */
+  byMoney: Standing[];
+  byWins: Standing[];
+  bestNight: { name: string; net: number; playedOn: string } | null;
+  biggestTransfer: { from: string; to: string; amountIls: number } | null;
+}
+
+export function periods(nights: Night[], transfers: Transfer[], by: 'month' | 'year'): PeriodSummary[] {
+  const len = by === 'month' ? 7 : 4;
+  const groups = new Map<string, Night[]>();
+  for (const n of nights) {
+    const k = n.playedOn.slice(0, len);
+    groups.set(k, [...(groups.get(k) ?? []), n]);
+  }
+  const nameOf = new Map(nights.map(n => [n.playerId, n.name]));
+  const keyOfGame = new Map(nights.map(n => [n.gameId, n.playedOn.slice(0, len)]));
+  return [...groups.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, ns]) => {
+      const won = winners(ns);
+      const st = new Map<string, Standing>();
+      for (const n of ns) {
+        const s = st.get(n.playerId) ?? { playerId: n.playerId, name: n.name, net: 0, wins: 0, nights: 0 };
+        s.net += n.net;
+        s.nights += 1;
+        if (won.has(`${n.gameId}:${n.playerId}`)) s.wins += 1;
+        st.set(n.playerId, s);
+      }
+      const all = [...st.values()];
+      const byMoney = [...all].sort((a, b) => b.net - a.net || a.nights - b.nights || a.name.localeCompare(b.name, 'he'));
+      // wins tie-break: more money
+      const byWins = [...all].filter(s => s.wins > 0).sort((a, b) => b.wins - a.wins || b.net - a.net || a.name.localeCompare(b.name, 'he'));
+      const topNet = byMoney[0]?.net ?? 0;
+      const topWins = byWins[0]?.wins ?? 0;
+      const best = ns.reduce<Night | null>((b, n) => (!b || n.net > b.net ? n : b), null);
+      const ts = transfers.filter(t => keyOfGame.get(t.gameId) === key && t.fromPlayerId);
+      const big = ts.reduce<Transfer | null>((b, t) => (!b || t.amountIls > b.amountIls ? t : b), null);
+      return {
+        key,
+        nights: new Set(ns.map(n => n.gameId)).size,
+        players: all.length,
+        pot: ns.reduce((s, n) => s + n.totalIn, 0),
+        moneyKing: topNet > 0 ? byMoney.filter(s => s.net === topNet) : [],
+        winsKing: topWins > 0 ? byWins.filter(s => s.wins === topWins) : [],
+        byMoney: byMoney.filter(s => s.net > 0).slice(0, 3),
+        byWins: byWins.slice(0, 3),
+        bestNight: best && best.net > 0 ? { name: best.name, net: best.net, playedOn: best.playedOn } : null,
+        biggestTransfer: big ? { from: nameOf.get(big.fromPlayerId!) ?? '', to: nameOf.get(big.toPlayerId) ?? '', amountIls: big.amountIls } : null,
+      };
+    });
+}

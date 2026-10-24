@@ -1,10 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useGroupStats } from '../../../lib/useGroupStats';
-import { playerStats } from '../../../core/stats';
+import { useAuth } from '../../../lib/auth';
+import { supabase } from '../../../lib/supabase';
+import { playerStats, headToHead, byKind } from '../../../core/stats';
 import { C, ils } from '../../../lib/theme';
-import { Screen, Txt, Num, Card, Row, Back, Loading } from '../../../ui/kit';
+import { Screen, Txt, Num, Card, Row, Back, Loading, Seg } from '../../../ui/kit';
 
 const day = (d: string) => new Date(d).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric' });
 
@@ -43,7 +45,19 @@ function NightBars({ trend }: { trend: { playedOn: string; net: number; cumulati
 export default function PlayerCard() {
   const { gid, pid } = useLocalSearchParams<{ gid: string; pid: string }>();
   const stats = useGroupStats(gid);
-  const s = useMemo(() => playerStats(stats.nights, pid), [stats.nights, pid]);
+  const { userId } = useAuth();
+  const [kind, setKind] = useState<'all' | 'cash' | 'tournament'>('all');
+  const [myId, setMyId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from('players').select('id').eq('group_id', gid).eq('profile_id', userId).maybeSingle()
+      .then(({ data }) => setMyId((data as { id: string } | null)?.id ?? null));
+  }, [gid, userId]);
+  const nights = useMemo(() => byKind(stats.nights, kind), [stats.nights, kind]);
+  const s = useMemo(() => playerStats(nights, pid), [nights, pid]);
+  const h2h = useMemo(() => (myId ? headToHead(nights, myId) : []), [nights, myId]);
+  const isMe = myId === pid;
+  const rows = isMe ? h2h : h2h.filter(h => h.otherId === pid);
   const name = stats.nights.find(n => n.playerId === pid)?.name ?? '';
   const myTitles = stats.titles.get(pid) ?? [];
 
@@ -76,12 +90,42 @@ export default function PlayerCard() {
         </View>
       )}
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+      {(
+        <View style={{ marginTop: 14 }}>
+          <Seg value={kind} onChange={setKind} options={[{ v: 'all', t: 'הכל' }, { v: 'cash', t: '💵 קאש' }, { v: 'tournament', t: '🏆 טורנירים' }]} />
+        </View>
+      )}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 0 }}>
         {tile('נטו מצטבר', ils(s.netTotal, true), s.netTotal > 0 ? C.pos : s.netTotal < 0 ? C.neg : undefined)}
-        {tile('ערבים', String(s.nights))}
-        {tile('ערבים ברווח', `${s.profitablePct}%`)}
-        {tile('כניסה ממוצעת לערב', ils(s.avgIn))}
+        {tile(kind === 'tournament' ? 'טורנירים' : 'ערבים', String(s.nights))}
+        {tile('ממוצע לערב', s.nights ? ils(Math.round(s.netTotal / s.nights), true) : '—')}
+        {kind === 'tournament' ? tile('🏆 נצחונות · פודיומים', `${s.wins} · ${s.podiums}`) : tile('ערבים ברווח', `${s.profitablePct}%`)}
+        {kind === 'tournament' ? tile('סיים בכסף', `${s.itmPct}%`) : tile('כניסה ממוצעת לערב', ils(s.avgIn))}
       </View>
+
+      {myId && rows.length > 0 && (
+        <Card style={{ marginTop: 12, gap: 8 }}>
+          <Txt weight="bold">{isMe ? 'ראש בראש: אני מול כל אחד' : `ראש בראש: אני מול ${name}`}</Txt>
+          <Txt muted size={12}>רק בערבים ששנינו שיחקנו</Txt>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Txt muted size={11} style={{ flex: 2 }}>מול</Txt>
+            <Txt muted size={11} style={{ flex: 1, textAlign: 'center' }}>ערבים</Txt>
+            <Txt muted size={11} style={{ flex: 1.4, textAlign: 'center' }}>אני</Txt>
+            <Txt muted size={11} style={{ flex: 1.4, textAlign: 'center' }}>היריב</Txt>
+            <Txt muted size={11} style={{ flex: 1.4, textAlign: 'center' }}>מי מעל</Txt>
+          </Row>
+          {rows.map(h => (
+            <Row key={h.otherId} style={{ justifyContent: 'space-between', paddingVertical: 6, borderTopWidth: 1, borderTopColor: C.line }}>
+              <Txt weight="bold" style={{ flex: 2 }}>{h.otherName}</Txt>
+              <Num style={{ flex: 1, textAlign: 'center' }}>{String(h.nights)}</Num>
+              <Num weight="bold" size={13} color={h.myNet >= 0 ? C.pos : C.neg} style={{ flex: 1.4, textAlign: 'center' }}>{ils(h.myNet, true)}</Num>
+              <Num size={13} color={h.otherNet >= 0 ? C.pos : C.neg} style={{ flex: 1.4, textAlign: 'center' }}>{ils(h.otherNet, true)}</Num>
+              <Num weight="bold" size={13} color={h.meAhead > h.otherAhead ? C.pos : h.meAhead < h.otherAhead ? C.neg : C.muted} style={{ flex: 1.4, textAlign: 'center' }}>{`${h.meAhead} נגד ${h.otherAhead}`}</Num>
+            </Row>
+          ))}
+          <Txt muted size={11}>מי מעל: בכמה ערבים סיימתי מעל היריב, נגד כמה הוא מעליי. בקאש לפי רווח, בטורניר לפי מקום.</Txt>
+        </Card>
+      )}
 
       {s.trend.length > 0 && (
         <Card style={{ marginTop: 12, gap: 10 }}>

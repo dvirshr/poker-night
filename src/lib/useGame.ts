@@ -4,7 +4,7 @@ import { pending, subscribe as onQueue, takeError } from './queue';
 import { playerTotals, potOf, gapOf, type LedgerEntry, type PlayerTotals } from '../core/settle';
 import { useAuth } from './auth';
 import { useOnResume } from '../ui/kit';
-import { THEMES, type ThemeKey } from './theme';
+import { THEMES, getMyTheme, setMyTheme, type ThemeKey } from './theme';
 import type { Level } from '../core/clock';
 
 export type Game = {
@@ -56,6 +56,8 @@ export function useGame(gameId: string) {
   const [loaded, setLoaded] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [theme, setTheme] = useState<ThemeKey>('graphite');
+  const [myTheme, setMine] = useState<ThemeKey | null>(() => getMyTheme());
+  const chooseTheme = useCallback((v: ThemeKey | null) => { setMyTheme(v); setMine(v); }, []);
   const [levels, setLevels] = useState<Level[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -183,7 +185,7 @@ export function useGame(gameId: string) {
   const unsynced = queued.length;
 
   return {
-    game, seats, rows, totals, settlements, levels, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[theme],
+    game, seats, rows, totals, settlements, levels, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

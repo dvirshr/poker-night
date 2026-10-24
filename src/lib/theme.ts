@@ -45,3 +45,12 @@ export const THEMES: Record<ThemeKey, { name: string; felt: string; rail: string
 /** Keeps "50 / 100" in reading order inside Hebrew text (otherwise it shows as "100 / 50"). */
 export const ltr = (t: string) => `\u2066${t}\u2069`;
 export const blinds = (sb: number, bb: number) => ltr(`${sb.toLocaleString('he-IL')} / ${bb.toLocaleString('he-IL')}`);
+
+/** Personal table look on this phone; null = the group's choice. */
+const MY_THEME = 'poker.myTheme.v1';
+export function getMyTheme(): ThemeKey | null {
+  try { const v = localStorage.getItem(MY_THEME); return v && v in THEMES ? (v as ThemeKey) : null; } catch { return null; }
+}
+export function setMyTheme(v: ThemeKey | null) {
+  try { if (v) localStorage.setItem(MY_THEME, v); else localStorage.removeItem(MY_THEME); } catch { /* ignore */ }
+}

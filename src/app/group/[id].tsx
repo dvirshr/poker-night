@@ -7,7 +7,7 @@ import { useAuth } from '../../lib/auth';
 import { C, ils } from '../../lib/theme';
 import { inviteLink, inviteMessage } from '../../lib/invite';
 import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
-import { monthly, monthName } from '../../core/stats';
+import { monthly, monthName, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
 import { THEMES, type ThemeKey } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
 
@@ -22,8 +22,9 @@ export default function Group() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [league, setLeague] = useState<League[]>([]);
-  const [byType, setByType] = useState<League[]>([]);
   const [kind, setKind] = useState<'all' | 'cash' | 'tournament'>('all');
+  const [sort, setSort] = useState<LeagueSort>('total');
+  const [mineOnly, setMineOnly] = useState(false);
   const [tab, setTab] = useState<'league' | 'month' | 'history' | 'members' | 'settings'>('league');
   const [editing, setEditing] = useState<string | null>(null);
   const [rename, setRename] = useState('');
@@ -40,9 +41,6 @@ export default function Group() {
       supabase.from('games').select('*').eq('group_id', id).order('created_at', { ascending: false }),
       supabase.from('league_table').select('*').eq('group_id', id).order('net_total', { ascending: false }),
     ]);
-    // split by game type (needs the tournament update; without it the overall table still works)
-    const bt = await supabase.from('league_by_type').select('*').eq('group_id', id).order('net_total', { ascending: false });
-    setByType(bt.error ? [] : ((bt.data ?? []) as League[]));
     if (g.error) return setErr(heError(g.error));
     setGroup(g.data);
     setPlayers((p.data ?? []) as Player[]);
@@ -171,33 +169,51 @@ export default function Group() {
         ]}
       />
 
-      {tab === 'league' && (
-        <View style={{ gap: 6 }}>
-          {new Set(byType.map(l => l.game_type)).size > 1 && (
-            <Seg value={kind} onChange={setKind} options={[{ v: 'all', t: 'הכל' }, { v: 'cash', t: '💵 קאש' }, { v: 'tournament', t: '🏆 טורנירים' }]} />
-          )}
-          {league.length === 0 && <Txt muted>הטבלה תתמלא אחרי הערב הראשון שנסגר</Txt>}
-          {stats.titles.size > 0 && (
-            <Txt muted size={12} style={{ marginBottom: 4 }}>
-              {[...new Map([...stats.titles.values()].flat().map(t => [t.key, t])).values()].map(t => `${t.emoji} ${t.label}`).join(' · ')}
-            </Txt>
-          )}
-          {(kind === 'all' ? league : byType.filter(l => l.game_type === kind)).map((l, i) => (
-            <Card key={l.player_id} onPress={() => router.push(`/player/${id}/${l.player_id}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}>
-              <Row>
-                <Num weight="black" size={16} color={C.muted}>{i + 1}</Num>
-                <View>
-                  <Txt weight="bold">{`${l.display_name} ${titleBadges(stats.titles.get(l.player_id))}`}</Txt>
-                  <Txt muted size={12}>{kind === 'tournament'
-                    ? `${l.games_played} טורנירים · ${l.wins} 🏆 · ${l.podiums ?? 0} פודיומים`
-                    : `${l.games_played} ערבים · ${l.wins} נצחונות · ממוצע ${ils(l.net_avg, true)}`}</Txt>
+      {tab === 'league' && (() => {
+        const rows = leagueRows(stats.nights, { sort, kind, withPlayer: mineOnly ? me?.id : null });
+        const metric = (r: LeagueRow) => (sort === 'avg' ? ils(Math.round(r.avg), true) : sort === 'wins' ? `${r.winPct}%` : ils(r.net, true));
+        const tone = (r: LeagueRow) => (sort === 'wins' ? C.text : r.net > 0 ? C.pos : r.net < 0 ? C.neg : C.muted);
+        let rank = 0;
+        return (
+          <View style={{ gap: 6 }}>
+            <Seg value={sort} onChange={setSort} options={[{ v: 'total', t: 'סה״כ' }, { v: 'avg', t: 'ממוצע לערב' }, { v: 'wins', t: '% נצחונות' }]} />
+            {(
+              <Seg value={kind} onChange={setKind} options={[{ v: 'all', t: 'הכל' }, { v: 'cash', t: '💵 קאש' }, { v: 'tournament', t: '🏆 טורנירים' }]} />
+            )}
+            {me && (
+              <Seg value={mineOnly ? 1 : 0} onChange={v => setMineOnly(v === 1)} options={[{ v: 0, t: 'כל הערבים' }, { v: 1, t: 'רק ערבים שהשתתפתי' }]} />
+            )}
+            {rows.length === 0 && <Txt muted>הטבלה תתמלא אחרי הערב הראשון שנסגר</Txt>}
+            {stats.titles.size > 0 && !mineOnly && kind === 'all' && (
+              <Txt muted size={12} style={{ marginBottom: 4 }}>
+                {[...new Map([...stats.titles.values()].flat().map(t => [t.key, t])).values()].map(t => `${t.emoji} ${t.label}`).join(' · ')}
+              </Txt>
+            )}
+            {rows.map((r, i) => {
+              const firstOut = !r.qualified && (i === 0 || rows[i - 1].qualified);
+              if (r.qualified) rank += 1;
+              return (
+                <View key={r.playerId} style={{ gap: 6 }}>
+                  {firstOut && <Txt muted size={12} style={{ marginTop: 8 }}>{`פחות מ־${MIN_NIGHTS} ערבים · לא מדורגים עדיין`}</Txt>}
+                  <Card onPress={() => router.push(`/player/${id}/${r.playerId}`)} accent={r.playerId === me?.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, opacity: r.qualified ? 1 : 0.55 }}>
+                    <Row>
+                      <Num weight="black" size={16} color={C.muted}>{r.qualified ? String(rank) : '–'}</Num>
+                      <View>
+                        <Txt weight="bold">{`${r.name} ${titleBadges(stats.titles.get(r.playerId))}`}</Txt>
+                        <Txt muted size={12}>{kind === 'tournament'
+                          ? `${r.nights} טורנירים · ${r.wins} 🏆 · ${r.podiums} פודיומים · סה״כ ${ils(r.net, true)}`
+                          : `${r.nights} ערבים · ${r.wins} נצחונות · ${sort === 'total' ? `ממוצע ${ils(Math.round(r.avg), true)}` : `סה״כ ${ils(r.net, true)}`}`}</Txt>
+                      </View>
+                    </Row>
+                    <Num weight="black" size={18} color={tone(r)}>{metric(r)}</Num>
+                  </Card>
                 </View>
-              </Row>
-              <Num weight="black" size={18} color={l.net_total > 0 ? C.pos : l.net_total < 0 ? C.neg : C.muted}>{ils(l.net_total, true)}</Num>
-            </Card>
-          ))}
-        </View>
-      )}
+              );
+            })}
+            {mineOnly && <Txt muted size={12} style={{ marginTop: 4 }}>מחושב רק מהערבים שבהם שיחקת: איך כל אחד עשה כשישבתם יחד</Txt>}
+          </View>
+        );
+      })()}
 
       {tab === 'month' && (
         <View style={{ gap: 8 }}>

@@ -8,8 +8,8 @@ export function useGroupStats(groupId: string) {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
 
   const load = useCallback(async () => {
-    const g = await supabase.from('games').select('id, played_on, closed_at').eq('group_id', groupId).eq('status', 'closed');
-    const games = (g.data ?? []) as { id: string; played_on: string; closed_at: string | null }[];
+    const g = await supabase.from('games').select('id, played_on, closed_at, game_type').eq('group_id', groupId).eq('status', 'closed');
+    const games = (g.data ?? []) as { id: string; played_on: string; closed_at: string | null; game_type: 'cash' | 'tournament' }[];
     if (!games.length) {
       setNights([]);
       setTransfers([]);
@@ -17,7 +17,7 @@ export function useGroupStats(groupId: string) {
     }
     const ids = games.map(x => x.id);
     const [t, s] = await Promise.all([
-      supabase.from('game_player_totals').select('game_id, player_id, display_name, total_in, rebuys, net').in('game_id', ids),
+      supabase.from('game_player_totals').select('game_id, player_id, display_name, total_in, rebuys, net, finish_place').in('game_id', ids),
       supabase.from('settlements').select('game_id, from_player_id, to_player_id, amount_ils').in('game_id', ids),
     ]);
     const meta = new Map(games.map(x => [x.id, x]));
@@ -31,6 +31,8 @@ export function useGroupStats(groupId: string) {
         totalIn: r.total_in,
         rebuys: r.rebuys,
         net: r.net,
+        gameType: meta.get(r.game_id)!.game_type,
+        place: r.finish_place ?? null,
       })),
     );
     setTransfers(((s.data ?? []) as any[]).map(r => ({ gameId: r.game_id, fromPlayerId: r.from_player_id, toPlayerId: r.to_player_id, amountIls: r.amount_ils })));

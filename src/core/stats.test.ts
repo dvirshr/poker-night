@@ -59,3 +59,50 @@ test('monthly summary', () => {
   assert.equal(oct.biggestTransfer!.amountIls, 30);
   assert.equal(monthName('2026-10'), 'אוקטובר 2026');
 });
+
+import { league } from './stats.ts';
+
+test('league: one lucky night does not top the average table', () => {
+  const ns: Night[] = [
+    ...['g1', 'g2', 'g3', 'g4'].flatMap((g, i) => [n(g, `2026-10-0${i + 1}`, 'maya', 80), n(g, `2026-10-0${i + 1}`, 'ron', -80)]),
+    n('g4', '2026-10-04', 'yossi', 300), n('g4', '2026-10-04', 'ron', -300),
+  ];
+  const t = league(ns, { sort: 'avg' });
+  assert.deepEqual(t.map(r => [r.playerId, r.qualified]), [['maya', true], ['ron', true], ['yossi', false]]);
+  assert.equal(t[0].avg, 80);
+  // by total too, yossi is listed last until he has 3 nights
+  assert.equal(league(ns, { sort: 'total' }).at(-1)!.playerId, 'yossi');
+});
+
+test('league: win rate, tournaments by place, cash by top net', () => {
+  const ns: Night[] = [
+    { ...n('c1', '2026-10-01', 'a', 50), gameType: 'cash' }, { ...n('c1', '2026-10-01', 'b', -50), gameType: 'cash' },
+    { ...n('t1', '2026-10-02', 'a', -100), gameType: 'tournament', place: 2 }, { ...n('t1', '2026-10-02', 'b', 100), gameType: 'tournament', place: 1 },
+    { ...n('t2', '2026-10-03', 'a', 20), gameType: 'tournament', place: 1 }, { ...n('t2', '2026-10-03', 'b', -20), gameType: 'tournament', place: 2 },
+  ];
+  const all = league(ns, { sort: 'wins' });
+  assert.deepEqual(all.map(r => [r.playerId, r.wins, r.winPct]), [['a', 2, 67], ['b', 1, 33]]);
+  const tour = league(ns, { sort: 'wins', kind: 'tournament' });
+  assert.deepEqual(tour.map(r => [r.playerId, r.wins, r.podiums]), [['a', 1, 2], ['b', 1, 2]]);
+});
+
+test('league: only the nights I played', () => {
+  const ns = [n('g1', '2026-10-01', 'me', 10), n('g1', '2026-10-01', 'x', -10), n('g2', '2026-10-02', 'x', 500), n('g2', '2026-10-02', 'y', -500)];
+  const t = league(ns, { sort: 'total', withPlayer: 'me' });
+  assert.deepEqual(t.map(r => [r.playerId, r.net]), [['me', 10], ['x', -10]]);
+});
+
+import { headToHead } from './stats.ts';
+
+test('head to head: only shared nights, places in tournaments', () => {
+  const ns: Night[] = [
+    n('g1', '2026-10-01', 'me', 50), n('g1', '2026-10-01', 'ron', -50),
+    n('g2', '2026-10-02', 'ron', 900), n('g2', '2026-10-02', 'maya', -900), // I was not there
+    { ...n('t1', '2026-10-03', 'me', -100), gameType: 'tournament', place: 3 }, { ...n('t1', '2026-10-03', 'ron', -100), gameType: 'tournament', place: 2 },
+    { ...n('t1', '2026-10-03', 'maya', 200), gameType: 'tournament', place: 1 },
+  ];
+  const h = headToHead(ns, 'me');
+  const ron = h.find(x => x.otherId === 'ron')!;
+  assert.deepEqual([ron.nights, ron.myNet, ron.otherNet, ron.meAhead, ron.otherAhead], [2, -50, -150, 1, 1]);
+  assert.deepEqual(h.map(x => x.otherId), ['ron', 'maya']);
+});

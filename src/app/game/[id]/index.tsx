@@ -6,7 +6,7 @@ import { supabase, heError } from '../../../lib/supabase';
 import { enqueue } from '../../../lib/queue';
 import { useGame, type Row as Entry } from '../../../lib/useGame';
 import { chipsToIls } from '../../../core/settle';
-import { C, ils } from '../../../lib/theme';
+import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap } from '../../../ui/kit';
 import { ClockBar } from '../../../ui/tournament';
 import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
@@ -33,6 +33,7 @@ export default function Table() {
   const [sheet, setSheet] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [handing, setHanding] = useState(false);
+  const [styling, setStyling] = useState(false);
   const alerts = useAlertPref(id, g.isBanker);
   useBlindAlertsSync(g.game, g.levels, alerts.on);
   const [, tick] = useState(0);
@@ -218,7 +219,26 @@ export default function Table() {
       {(g.isBanker || g.isAdmin) && (
         <Btn small kind="ghost" title="העברת תפקיד הבנקאי" style={{ marginTop: 14 }} onPress={() => setHanding(true)} />
       )}
-      <Btn small kind="ghost" title="📜 יומן הערב" style={{ marginTop: 10 }} onPress={() => router.push(`/game/${id}/log`)} />
+      <Row style={{ marginTop: 10 }}>
+        <Btn small kind="ghost" title="📜 יומן הערב" style={{ flex: 1 }} onPress={() => router.push(`/game/${id}/log`)} />
+        <Btn small kind="ghost" title="🎨 עיצוב שולחן" style={{ flex: 1 }} onPress={() => setStyling(true)} />
+      </Row>
+      <Sheet open={styling} onClose={() => setStyling(false)}>
+        <Txt size={22} weight="black">עיצוב השולחן אצלי</Txt>
+        <Txt muted size={13}>רק בטלפון הזה. אצל השאר לא משתנה כלום.</Txt>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {([null, ...(Object.keys(THEMES) as ThemeKey[])] as (ThemeKey | null)[]).map(k => {
+            const t = THEMES[k ?? g.groupTheme];
+            const on = g.myTheme === k;
+            return (
+              <Pressable key={k ?? 'group'} onPress={() => { tap(); g.chooseTheme(k); }} style={{ width: 96, alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 84, height: 56, borderRadius: 28, backgroundColor: t.felt, borderWidth: 6, borderColor: on ? C.acc : t.rail }} />
+                <Txt size={13} weight={on ? 'bold' : 'regular'} color={on ? C.acc : C.text} center>{k ? t.name : `של הקבוצה (${t.name})`}</Txt>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Sheet>
 
       <PlayerSheet
         open={!!sheet && g.isBanker}

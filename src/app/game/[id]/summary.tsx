@@ -7,7 +7,7 @@ import { enqueue } from '../../../lib/queue';
 import { useGame, type Settlement } from '../../../lib/useGame';
 import { minTransfers, potPayouts, proportionalAdjustments } from '../../../core/settle';
 import { C, ils, medal } from '../../../lib/theme';
-import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Badge, Loading, RefreshBtn } from '../../../ui/kit';
+import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Badge, Loading, RefreshBtn, ConfirmBtn } from '../../../ui/kit';
 import { Fireworks } from '../../../ui/Fireworks';
 
 const CELEBRATED = 'poker.celebrated.v1';
@@ -108,7 +108,8 @@ export default function Summary() {
       </Row>
     );
   } else if (g.isBanker && allCounted && g.gap === 0) {
-    footer = <Btn title="אישור וסגירת הערב" onPress={close} busy={busy} disabled={g.unsynced > 0} />;
+    footer = <ConfirmBtn title="אישור וסגירת הערב" onConfirm={close} busy={busy} disabled={g.unsynced > 0}
+      confirmTitle="לסגור את הערב?" message={`קופה ${ils(g.pot)} · ${plan.length} ${cash ? 'תשלומים מהקופה' : 'העברות'}.\n\nאחרי הסגירה הערב ננעל ואי אפשר לשנות אותו.`} />;
   }
 
   return (

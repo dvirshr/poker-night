@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, AppState, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -226,5 +226,38 @@ export function Back({ label = 'חזרה', to }: { label?: string; to?: string }
         <Txt color={C.acc} size={14} weight="medium">{label}</Txt>
       </View>
     </Pressable>
+  );
+}
+
+/**
+ * For actions that cannot be undone (closing a night / a tournament): a confirm sheet,
+ * and taps in the first second after the screen opens are ignored, so a double tap on
+ * the previous screen's button can never land here.
+ */
+export function ConfirmBtn({ title, confirmTitle, message, onConfirm, busy, disabled }: {
+  title: string; confirmTitle: string; message: string; onConfirm: () => void; busy?: boolean; disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setArmed(true), 1000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <>
+      <Btn title={title} onPress={() => armed && setOpen(true)} busy={busy} disabled={disabled} />
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: '#000c', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <View style={{ width: '100%', maxWidth: 420, backgroundColor: C.surf, borderRadius: 20, borderWidth: 1, borderColor: C.line, padding: 20, gap: 14 }}>
+            <Txt size={20} weight="black">{confirmTitle}</Txt>
+            <Txt size={14} muted>{message}</Txt>
+            <Row>
+              <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => setOpen(false)} />
+              <Btn small title="כן, לסגור" style={{ flex: 2 }} onPress={() => { setOpen(false); onConfirm(); }} />
+            </Row>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }

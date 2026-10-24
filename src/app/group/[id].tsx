@@ -202,8 +202,8 @@ export default function Group() {
                       <View>
                         <Txt weight="bold">{`${r.name} ${titleBadges(stats.titles.get(r.playerId))}`}</Txt>
                         <Txt muted size={12}>{kind === 'tournament'
-                          ? `${r.nights} טורנירים · ${r.wins} 🏆 · ${r.podiums} פודיומים · סה״כ ${ils(r.net, true)}`
-                          : `${r.nights} ערבים · ${r.wins} נצחונות · ${sort === 'total' ? `ממוצע ${ils(Math.round(r.avg), true)}` : `סה״כ ${ils(r.net, true)}`}`}</Txt>
+                          ? `${r.nights === 1 ? 'טורניר אחד' : `${r.nights} טורנירים`} · ${r.wins} 🏆 · ${r.podiums} פודיומים · סה״כ ${ils(r.net, true)}`
+                          : `${r.nights === 1 ? 'ערב אחד' : `${r.nights} ערבים`} · ${r.wins === 1 ? 'נצחון אחד' : `${r.wins} נצחונות`} · ${sort === 'total' ? `ממוצע ${ils(Math.round(r.avg), true)}` : `סה״כ ${ils(r.net, true)}`}`}</Txt>
                       </View>
                     </Row>
                     <Num weight="black" size={18} color={tone(r)}>{metric(r)}</Num>

@@ -6,7 +6,7 @@ import { useGame } from '../../../lib/useGame';
 import { finishOrder } from '../../../core/clock';
 import { minTransfers, potPayouts, tournamentPrizes, type PlayerTotals } from '../../../core/settle';
 import { C, ils, medal } from '../../../lib/theme';
-import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Loading, Badge, tap } from '../../../ui/kit';
+import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Loading, Badge, tap, ConfirmBtn } from '../../../ui/kit';
 import { PayoutEditor, payoutValid } from '../../../ui/tournament';
 
 export default function Finish() {
@@ -58,7 +58,9 @@ export default function Finish() {
   };
 
   return (
-    <Screen footer={g.isBanker ? <Btn title="🏆 אישור וסגירת הטורניר" onPress={close} busy={busy} disabled={!ok || g.unsynced > 0 || n < 2} /> : undefined}>
+    <Screen footer={g.isBanker ? <ConfirmBtn title="🏆 אישור וסגירת הטורניר" onConfirm={close} busy={busy} disabled={!ok || g.unsynced > 0 || n < 2}
+      confirmTitle="לסגור את הטורניר?"
+      message={`${list.slice(0, 3).map((pid, i) => `${['🥇', '🥈', '🥉'][i]} ${nameOf(pid)}${prizes[i] ? ` ${ils(prizes[i])}` : ''}`).join('  ')}${alive > 1 ? `\n\nשים לב: ${alive} שחקנים עוד לא סומנו כמודחים, והמקומות שלהם נקבעו לפי הסדר ברשימה.` : ''}\n\nאחרי הסגירה הטורניר ננעל ואי אפשר לשנות אותו.`} /> : undefined}>
       <Row style={{ justifyContent: 'space-between' }}>
         <Back label="לשולחן" to={`/game/${id}`} />
         <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} />

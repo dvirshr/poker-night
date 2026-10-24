@@ -35,6 +35,7 @@ export default function Table() {
   const [adding, setAdding] = useState(false);
   const [handing, setHanding] = useState(false);
   const [styling, setStyling] = useState(false);
+  const [hostPick, setHostPick] = useState(false);
   const alerts = useAlertPref(id, g.isBanker);
   useBlindAlertsSync(g.game, g.levels, alerts.on);
   const [, tick] = useState(0);
@@ -152,6 +153,11 @@ export default function Table() {
           <Txt muted size={13}>
             {`${tour ? '🏆 טורניר · ' : ''}${game.settlement_mode === 'cash_on_table' ? 'מזומן על השולחן' : 'רישום · ביט'} · כניסה ${ils(game.buy_in_ils)}${game.rebuy_policy === 'none' ? ' · בלי ריבאיים' : ` · עד ${game.max_rebuys} ריבאיים`}`}
           </Txt>
+          {(g.hostName || ((g.isBanker || g.isAdmin) && game.status !== 'closed')) && (
+            <Pressable disabled={!(g.isBanker || g.isAdmin) || game.status === 'closed'} onPress={() => setHostPick(true)}>
+              <Txt size={13} color={g.hostName ? C.text : C.muted}>{g.hostName ? `🏠 אצל ${g.hostName}${g.isBanker || g.isAdmin ? ' ✎' : ''}` : '🏠 מארח: לא נקבע ✎'}</Txt>
+            </Pressable>
+          )}
           <Txt muted size={13}>{g.isBanker ? 'אתה הבנקאי' : `צפייה · בנקאי: ${g.seats.find(s => s.profile_id === game.banker_profile_id)?.display_name ?? '—'}`}</Txt>
         </View>
         <LivePill live={g.live} unsynced={g.unsynced} onRefresh={g.reload} />
@@ -225,6 +231,13 @@ export default function Table() {
         <Btn small kind="ghost" title="📜 יומן הערב" style={{ flex: 1 }} onPress={() => router.push(`/game/${id}/log`)} />
         <Btn small kind="ghost" title="🎨 עיצוב שולחן" style={{ flex: 1 }} onPress={() => setStyling(true)} />
       </Row>
+      <HostPicker open={hostPick} onClose={() => setHostPick(false)} groupId={game.group_id} current={game.host_player_id ?? null}
+        onPick={async pid => {
+          const { error } = await supabase.from('games').update({ host_player_id: pid }).eq('id', id);
+          if (error) return g.setError(heError(error));
+          setHostPick(false);
+          void g.reload();
+        }} />
       <Sheet open={styling} onClose={() => setStyling(false)}>
         <Txt size={22} weight="black">עיצוב השולחן אצלי</Txt>
         <Txt muted size={13}>רק בטלפון הזה. אצל השאר לא משתנה כלום.</Txt>
@@ -448,6 +461,25 @@ function AddPlayer({ open, onClose, groupId, seated, onAdd }: { open: boolean; o
           onAdd(data.id);
         }}
       />
+    </Sheet>
+  );
+}
+
+function HostPicker({ open, onClose, groupId, current, onPick }: { open: boolean; onClose: () => void; groupId: string; current: string | null; onPick: (pid: string | null) => void }) {
+  const [list, setList] = useState<{ id: string; display_name: string }[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    supabase.from('players').select('id, display_name').eq('group_id', groupId).eq('status', 'active').order('display_name')
+      .then(({ data }) => setList((data ?? []) as { id: string; display_name: string }[]));
+  }, [open, groupId]);
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <Txt size={22} weight="black">🏠 מי מארח הערב?</Txt>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {list.map(p => <Btn key={p.id} small kind={p.id === current ? 'primary' : 'ghost'} title={p.display_name} onPress={() => onPick(p.id)} />)}
+        <Btn small kind={!current ? 'primary' : 'ghost'} title="בלי מארח" onPress={() => onPick(null)} />
+      </View>
+      <Txt muted size={12}>נקבע לערב הזה ונספר בטבלת האירוח. אחרי סגירת הערב כבר לא משתנה.</Txt>
     </Sheet>
   );
 }

@@ -7,6 +7,7 @@ import { C, ils } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Back, tap } from '../../ui/kit';
 import { BlindEditor, PayoutEditor, levelsValid, payoutValid } from '../../ui/tournament';
 import { makeStructure, suggestedPayout, type Level } from '../../core/clock';
+import { nextHost } from '../../core/hosting';
 
 type Player = { id: string; display_name: string; profile_id: string | null; role: string };
 const DAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -32,14 +33,26 @@ export default function NewGame() {
   const [levels, setLevels] = useState<Level[]>(() => makeStructure(25, 15, 12));
   const [payout, setPayout] = useState<number[] | null>(null); // null = follow the number of players
   const [tStack, setTStack] = useState('5000');
+  const [hosting, setHosting] = useState<{ on: boolean; rotation: string[] }>({ on: false, rotation: [] });
+  const [host, setHost] = useState<string>(''); // '' = no host
 
   useEffect(() => {
     (async () => {
       const [g, p] = await Promise.all([
-        supabase.from('groups').select('banker_mode').eq('id', group).single(),
+        supabase.from('groups').select('*').eq('id', group).single(),
         supabase.from('players').select('id, display_name, profile_id, role').eq('group_id', group).eq('status', 'active').order('display_name'),
       ]);
       if (g.data) setMode(g.data.banker_mode);
+      // hosting rotation: tonight's host = next in turn
+      if (g.data?.hosting_enabled) {
+        const rot = ((g.data.host_rotation ?? []) as string[]);
+        setHosting({ on: true, rotation: rot });
+        const past = await supabase.from('games').select('id, played_on, created_at, host_player_id').eq('group_id', group);
+        const nx = nextHost(rot.filter(pid => (p.data ?? []).some((x: { id: string }) => x.id === pid)),
+          ((past.data ?? []) as { id: string; played_on: string; created_at: string; host_player_id: string | null }[])
+            .map(r => ({ gameId: r.id, playedOn: r.played_on, createdAt: r.created_at, hostId: r.host_player_id })));
+        if (nx) setHost(nx);
+      }
       const list = (p.data ?? []) as Player[];
       setPlayers(list);
       setPicked(list.filter(x => x.profile_id === userId).map(x => x.id));
@@ -106,6 +119,7 @@ export default function NewGame() {
           group_id: group, name: name.trim(), game_type: type, buy_in_ils: amount, start_stack_chips: stack, settlement_mode: settle,
           rebuy_policy: policy, max_rebuys: maxRebuys, quick_rebuys: tour ? [amount] : quick, banker_profile_id: userId,
           payout_pct: tour ? split : null,
+          ...(hosting.on && host ? { host_player_id: host } : {}),
         })
         .select('id')
         .single();
@@ -192,6 +206,19 @@ export default function NewGame() {
           <BlindEditor levels={levels} onChange={setLevels} />
           <View style={{ height: 18 }} />
         </>
+      )}
+
+      {hosting.on && (
+        <Seg
+          label="🏠 מארח הערב"
+          value={host}
+          onChange={setHost}
+          options={[
+            ...[...hosting.rotation.filter(pid => players.some(p => p.id === pid)), ...players.filter(p => !hosting.rotation.includes(p.id)).map(p => p.id)]
+              .map(pid => ({ v: pid, t: players.find(p => p.id === pid)!.display_name })),
+            { v: '', t: 'בלי מארח' },
+          ]}
+        />
       )}
 
       {mode === 'admin_assigns' && accounts.length > 0 && (

@@ -484,3 +484,24 @@ select test.ok((select min(c) > 420 and max(c) < 580 from (select count(*) c fro
                'draw is uniform: each of 4 players got 420..580 of 2,002 draws');
 select player_id, count(*) from public.game_draws where game_id = '20000000-0000-0000-0000-0000000000d1' group by player_id;
 select 'DRAW TESTS PASSED' as result;
+
+-- ---------- hosting (migration 9) ----------
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+update public.groups set hosting_enabled = true, host_rotation = array[:'t_ron', :'t_gal', :'t_maya']::uuid[] where id = '10000000-0000-0000-0000-000000000001';
+select test.ok((select cardinality(host_rotation) from public.groups where id = '10000000-0000-0000-0000-000000000001') = 3, 'admin sets the hosting order');
+update public.games set host_player_id = :'t_gal' where id = '20000000-0000-0000-0000-0000000000d1';
+select test.ok((select host_player_id from public.games where id = '20000000-0000-0000-0000-0000000000d1') = :'t_gal', 'banker sets tonight''s host');
+reset role;
+insert into public.groups (id, name, created_by) values ('10000000-0000-0000-0000-0000000000e2', 'קבוצה אחרת', '00000000-0000-0000-0000-00000000000b');
+select id as other_player from public.players where group_id = '10000000-0000-0000-0000-0000000000e2' limit 1 \gset
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select test.fails(format($$update public.games set host_player_id = %L where id = '20000000-0000-0000-0000-0000000000d1'$$, :'other_player'),
+                  'host must be a player', 'host from another group is rejected');
+select test.fails($$update public.games set host_player_id = null where id = '20000000-0000-0000-0000-0000000000f1'$$, 'closed', 'a closed night keeps its host');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000d', false);
+update public.groups set host_rotation = '{}' where id = '10000000-0000-0000-0000-000000000001';
+select test.ok((select cardinality(host_rotation) from public.groups where id = '10000000-0000-0000-0000-000000000001') = 3, 'a member cannot change the order');
+reset role;
+select 'HOSTING TESTS PASSED' as result;

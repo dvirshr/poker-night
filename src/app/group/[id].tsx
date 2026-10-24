@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { supabase, heError } from '../../lib/supabase';
@@ -7,18 +7,19 @@ import { useAuth } from '../../lib/auth';
 import { C, ils, medal } from '../../lib/theme';
 import { inviteLink, inviteMessage } from '../../lib/invite';
 import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
+import { hostTable } from '../../core/hosting';
 import { monthName, periods, byKind, type Standing, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
 import { THEMES, type ThemeKey } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
-type Game = { id: string; name: string; status: string; played_on: string; game_type?: string };
+type Game = { id: string; name: string; status: string; played_on: string; created_at: string; game_type?: string; host_player_id?: string | null };
 type League = { player_id: string; display_name: string; games_played: number; net_total: number; net_avg: number; wins: number; game_type?: string; podiums?: number };
 
 export default function Group() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { userId } = useAuth();
-  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey } | null>(null);
+  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey; hosting_enabled?: boolean; host_rotation?: string[] } | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [league, setLeague] = useState<League[]>([]);
@@ -26,7 +27,7 @@ export default function Group() {
   const [sort, setSort] = useState<LeagueSort>('total');
   const [mineOnly, setMineOnly] = useState(false);
   const [period, setPeriod] = useState<'month' | 'year'>('month');
-  const [tab, setTab] = useState<'league' | 'month' | 'history' | 'members' | 'settings'>('league');
+  const [tab, setTab] = useState<'league' | 'month' | 'history' | 'hosting' | 'members' | 'settings'>('league');
   const [editing, setEditing] = useState<string | null>(null);
   const [rename, setRename] = useState('');
   const [invite, setInvite] = useState<string | null>(null);
@@ -58,6 +59,11 @@ export default function Group() {
   const open = games.find(g => g.status !== 'closed');
   const active = players.filter(p => p.status === 'active');
   const pendingList = players.filter(p => p.status === 'pending');
+  const hostingOn = !!group?.hosting_enabled;
+  const rotation = (group?.host_rotation ?? []).filter(pid => active.some(p => p.id === pid));
+  const hostedNights = games.map(g => ({ gameId: g.id, playedOn: g.played_on, createdAt: g.created_at, hostId: g.host_player_id ?? null }));
+  const pname = (pid: string | null | undefined) => players.find(p => p.id === pid)?.display_name ?? '';
+  const setRotation = (r: string[]) => run(() => supabase.from('groups').update({ host_rotation: r }).eq('id', id));
   const guests = active.filter(p => !p.profile_id);
 
   const run = async (fn: () => PromiseLike<{ error: unknown }>) => {
@@ -88,7 +94,7 @@ export default function Group() {
             <Txt weight="bold" size={17}>{open.name}</Txt>
             <Badge solid text={open.status === 'open' ? 'משחקים עכשיו' : 'בספירה'} />
           </Row>
-          <Txt muted size={13}>הקשה לכניסה לשולחן</Txt>
+          <Txt muted size={13}>{open.host_player_id ? `🏠 אצל ${pname(open.host_player_id)} · הקשה לכניסה לשולחן` : 'הקשה לכניסה לשולחן'}</Txt>
         </Card>
       ) : (
         <View style={{ marginBottom: 16, gap: 6 }}>
@@ -165,6 +171,7 @@ export default function Group() {
           { v: 'league', t: 'טבלת ליגה' },
           { v: 'month', t: 'חודשי ושנתי' },
           { v: 'history', t: 'היסטוריה' },
+          ...(hostingOn ? [{ v: 'hosting' as const, t: '🏠 אירוח' }] : []),
           { v: 'members', t: 'שחקנים' },
           ...(isAdmin ? [{ v: 'settings' as const, t: 'הגדרות' }] : []),
         ]}
@@ -294,11 +301,57 @@ export default function Group() {
             .map(g => (
               <Card key={g.id} onPress={() => router.push(`/game/${g.id}/summary`)}>
                 <Txt weight="bold">{`${g.game_type === 'tournament' ? '🏆 ' : ''}${g.name}`}</Txt>
-                <Txt muted size={12}>{new Date(g.played_on).toLocaleDateString('he-IL')}</Txt>
+                <Txt muted size={12}>{`${new Date(g.played_on).toLocaleDateString('he-IL')}${g.host_player_id ? ` · 🏠 אצל ${pname(g.host_player_id)}` : ''}`}</Txt>
               </Card>
             ))}
         </View>
       )}
+
+      {tab === 'hosting' && hostingOn && (() => {
+        const rows = hostTable(rotation, hostedNights);
+        const next = rows.find(r => r.isNext);
+        const outside = [...new Set(games.map(g => g.host_player_id).filter((x): x is string => !!x && !rotation.includes(x)))]
+          .map(pid => ({ pid, times: games.filter(g => g.host_player_id === pid).length }));
+        const total = games.filter(g => g.host_player_id).length;
+        const day = (d: string | null) => (d ? new Date(d).toLocaleDateString('he-IL') : '—');
+        return (
+          <View style={{ gap: 8 }}>
+            {next ? (
+              <Card accent style={{ gap: 2 }}>
+                <Txt muted size={13}>הבא בתור לארח</Txt>
+                <Txt weight="black" size={24}>{`🏠 ${pname(next.playerId)}`}</Txt>
+              </Card>
+            ) : (
+              <Card><Txt muted>{isAdmin ? 'עוד אין סדר אירוח. בונים אותו בלשונית "הגדרות".' : 'המנהל עוד לא קבע סדר אירוח'}</Txt></Card>
+            )}
+            {rows.length > 0 && (
+              <Card style={{ gap: 6 }}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Txt muted size={11} style={{ width: 28 }}>תור</Txt>
+                  <Txt muted size={11} style={{ flex: 2 }}>שחקן</Txt>
+                  <Txt muted size={11} style={{ flex: 1, textAlign: 'center' }}>אירח</Txt>
+                  <Txt muted size={11} style={{ flex: 1.6, textAlign: 'center' }}>פעם אחרונה</Txt>
+                </Row>
+                {rows.map((r, i) => (
+                  <Row key={r.playerId} style={{ justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: C.line }}>
+                    <Num weight="bold" color={C.muted} style={{ width: 28 }}>{String(i + 1)}</Num>
+                    <Txt weight={r.isNext ? 'black' : 'bold'} color={r.isNext ? C.acc : C.text} style={{ flex: 2 }}>{`${pname(r.playerId)}${r.isNext ? ' · הבא' : ''}`}</Txt>
+                    <Num weight="bold" style={{ flex: 1, textAlign: 'center' }}>{String(r.times)}</Num>
+                    <Txt muted size={13} style={{ flex: 1.6, textAlign: 'center' }}>{day(r.last)}</Txt>
+                  </Row>
+                ))}
+                <Txt muted size={11}>{`סה״כ ${total} ערבים עם מארח. "הבא" נקבע לפי מי שאירח אחרון והסדר ברשימה, כך שהחלפת תור מסתדרת לבד.`}</Txt>
+              </Card>
+            )}
+            {outside.length > 0 && (
+              <Card style={{ gap: 4 }}>
+                <Txt weight="bold">אירחו מחוץ לסבב</Txt>
+                {outside.map(o => <Txt key={o.pid} size={14}>{`${pname(o.pid)} · ${o.times === 1 ? 'פעם אחת' : `${o.times} פעמים`}`}</Txt>)}
+              </Card>
+            )}
+          </View>
+        );
+      })()}
 
       {tab === 'members' && (
         <View style={{ gap: 6 }}>
@@ -398,6 +451,46 @@ export default function Group() {
 
       {tab === 'settings' && isAdmin && group && (
         <View style={{ gap: 12 }}>
+          <Card style={{ gap: 8 }}>
+            <Txt weight="bold" size={16}>🏠 סבב אירוח</Txt>
+            <Seg value={hostingOn ? 1 : 0} onChange={v => run(() => supabase.from('groups').update({ hosting_enabled: v === 1 }).eq('id', id))}
+              options={[{ v: 0, t: 'כבוי' }, { v: 1, t: 'פעיל' }]} />
+            {hostingOn && (
+              <>
+                <Txt muted size={12}>הסדר שבו מארחים. בפתיחת ערב, הבא בתור מסומן אוטומטית כמארח (אפשר לשנות).</Txt>
+                {rotation.map((pid, i) => (
+                  <Row key={pid} style={{ justifyContent: 'space-between', paddingVertical: 4 }}>
+                    <Row>
+                      <Num weight="bold" color={C.muted}>{String(i + 1)}</Num>
+                      <Txt weight="bold">{pname(pid)}</Txt>
+                    </Row>
+                    <Row style={{ gap: 14 }}>
+                      <Pressable hitSlop={8} disabled={i === 0} onPress={() => { const r = [...rotation]; [r[i - 1], r[i]] = [r[i], r[i - 1]]; setRotation(r); }}>
+                        <Txt weight="bold" size={18} color={i === 0 ? C.line : C.acc}>▲</Txt>
+                      </Pressable>
+                      <Pressable hitSlop={8} disabled={i === rotation.length - 1} onPress={() => { const r = [...rotation]; [r[i + 1], r[i]] = [r[i], r[i + 1]]; setRotation(r); }}>
+                        <Txt weight="bold" size={18} color={i === rotation.length - 1 ? C.line : C.acc}>▼</Txt>
+                      </Pressable>
+                      <Pressable hitSlop={8} onPress={() => setRotation(rotation.filter(x => x !== pid))} accessibilityLabel={`הוצאת ${pname(pid)} מהסבב`}>
+                        <Txt weight="bold" size={18} color={C.danger}>✕</Txt>
+                      </Pressable>
+                    </Row>
+                  </Row>
+                ))}
+                {active.filter(p => !rotation.includes(p.id)).length > 0 && (
+                  <>
+                    <Txt muted size={12} style={{ marginTop: 4 }}>להוספה לסוף הסבב:</Txt>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                      {active.filter(p => !rotation.includes(p.id)).map(p => (
+                        <Btn key={p.id} small kind="ghost" title={`+ ${p.display_name}`} style={{ height: 38, paddingHorizontal: 12 }} onPress={() => setRotation([...rotation, p.id])} />
+                      ))}
+                    </View>
+                  </>
+                )}
+                <Txt muted size={11}>יש כבר סבב קיים? שים בסוף הרשימה את מי שאירח אחרון, וכך הבא אחריו יהיה ראשון.</Txt>
+              </>
+            )}
+          </Card>
           <Card style={{ gap: 6 }}>
             <Txt weight="bold" size={16}>מי פותח ערב</Txt>
             <Seg

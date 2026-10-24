@@ -27,6 +27,7 @@ export type Game = {
   clock_anchor: string | null;
   clock_paused_at: string | null;
   blinds_rev: number;
+  host_player_id?: string | null;
 };
 export type Seat = { player_id: string; seat_no: number | null; display_name: string; profile_id: string | null; eliminated_at: string | null; finish_place: number | null };
 export type Row = {
@@ -61,6 +62,7 @@ export function useGame(gameId: string) {
   const chooseTheme = useCallback((v: ThemeKey | null) => { setMyTheme(v); setMine(v); }, []);
   const [levels, setLevels] = useState<Level[]>([]);
   const [draws, setDraws] = useState<Draw[]>([]);
+  const [hostName, setHostName] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -101,6 +103,11 @@ export function useGame(gameId: string) {
     // dealer draws (missing table before the update = no draws, never an error)
     const dr = await supabase.from('game_draws').select('id, player_id, draw_no, pool, drawn_at').eq('game_id', gameId).order('draw_no');
     setDraws(dr.error ? [] : ((dr.data ?? []) as Draw[]));
+    const hid = (g.data as Game).host_player_id;
+    if (hid) {
+      const h = await supabase.from('players').select('display_name').eq('id', hid).maybeSingle();
+      setHostName((h.data as { display_name: string } | null)?.display_name ?? null);
+    } else setHostName(null);
     setLoaded(true);
   }, [gameId, userId]);
 
@@ -193,7 +200,7 @@ export function useGame(gameId: string) {
   const unsynced = queued.length;
 
   return {
-    game, seats, rows, totals, settlements, levels, draws, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
+    game, seats, rows, totals, settlements, levels, draws, hostName, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

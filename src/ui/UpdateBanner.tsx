@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 import Constants from 'expo-constants';
 import { APK_LINK } from '../lib/guide';
+import { downloadAndInstall } from '../lib/selfUpdate';
 import { C } from '../lib/theme';
 import { Txt, Btn, Card, Row, useOnResume } from './kit';
 
@@ -24,6 +25,8 @@ export function UpdateBanner() {
   const [latest, setLatest] = useState<{ version: string; notes: string; important: boolean } | null>(null);
   const [dismissed, setDismissed] = useState(readDismissed);
   const [checkedAt, setCheckedAt] = useState(0);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const check = useCallback(async () => {
     if (Platform.OS === 'web' || Date.now() - checkedAt < 30 * 60_000) return;
@@ -52,7 +55,19 @@ export function UpdateBanner() {
           {latest.notes.split('\n').filter(l => l.trim()).slice(0, 8).map((l, i) => <Txt key={i} size={14}>{l.trim()}</Txt>)}
         </View>
       )}
-      <Txt muted size={12}>בסוף ההורדה: "פתח" ואז "עדכן". נשארים מחוברים, שום דבר לא נמחק.</Txt>
+      {progress != null && progress < 1 ? (
+        <View style={{ gap: 4 }}>
+          <Txt size={13}>{`מוריד… ${Math.round(progress * 100)}%`}</Txt>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: C.line, overflow: 'hidden' }}>
+            <View style={{ width: `${Math.round(progress * 100)}%`, height: 6, backgroundColor: C.acc, alignSelf: 'flex-start' }} />
+          </View>
+        </View>
+      ) : (
+        <Txt muted size={12}>{progress === 1
+          ? 'בחלון של אנדרואיד: "עדכן", ובסוף "פתח". בפעם הראשונה אנדרואיד שולח להגדרות: להפעיל "אפשר מהמקור הזה" ולחזור.'
+          : 'ההורדה וההתקנה מתוך האפליקציה. נשארים מחוברים, שום דבר לא נמחק.'}</Txt>
+      )}
+      {failed && <Txt size={12} color={C.neg}>ההורדה לא הצליחה. אפשר לנסות שוב, או להוריד דרך הדפדפן.</Txt>}
       <Row>
         {!latest.important && (
           <Btn small kind="ghost" title="אחר כך" style={{ flex: 1 }} onPress={() => {
@@ -60,8 +75,19 @@ export function UpdateBanner() {
             setDismissed(latest.version);
           }} />
         )}
-        <Btn small title="הורדה והתקנה" style={{ flex: 2 }} onPress={() => void Linking.openURL(APK_LINK)} />
+        <Btn small title={progress === 1 ? 'להתקנה' : 'עדכון עכשיו'} style={{ flex: 2 }} busy={progress != null && progress < 1}
+          onPress={async () => {
+            setFailed(false);
+            setProgress(0);
+            try {
+              await downloadAndInstall(APK_LINK, latest.version, setProgress);
+            } catch {
+              setFailed(true);
+              setProgress(null);
+            }
+          }} />
       </Row>
+      {failed && <Btn small kind="ghost" title="הורדה דרך הדפדפן" onPress={() => void Linking.openURL(APK_LINK)} />}
     </Card>
   );
 }

@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 OLD=$(mktemp -d)
 [ -d docs/_expo/static/js/web ] && cp -r docs/_expo/static/js/web/. "$OLD"/ || true
 rm -rf docs
-EXPO_OFFLINE=1 CI=1 npx expo export --platform web --output-dir docs
+EXPO_PUBLIC_BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) EXPO_OFFLINE=1 CI=1 npx expo export --platform web --output-dir docs
 cp -n "$OLD"/* docs/_expo/static/js/web/ 2>/dev/null || true
 rm -rf "$OLD"
 python3 - << 'PY'

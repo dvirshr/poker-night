@@ -1,6 +1,9 @@
 import { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { UpdateBanner } from '../ui/UpdateBanner';
 import { supabase, heError } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
@@ -104,6 +107,7 @@ export default function Home() {
         </Row>
       </Row>
       <ErrorBar text={err} onClose={() => setErr(null)} />
+      <UpdateBanner />
       {retry && (
         <Card accent style={{ marginBottom: 12, gap: 4 }}>
           <Txt weight="bold" size={16}>{`השם "${me}" כבר תפוס בקבוצה`}</Txt>
@@ -183,7 +187,14 @@ export default function Home() {
         </Card>
       )}
       <View style={{ height: 24 }} />
-      <Txt size={11} color={C.line} center>v0.1</Txt>
+      <Txt size={11} color={C.muted} center>{appVersion()}</Txt>
     </Screen>
   );
+}
+
+/** Android: the APK's version (0.1.N, set by the build). Web: when the site was last updated. */
+function appVersion() {
+  if (Platform.OS !== 'web') return `אנדרואיד · גרסה ${Constants.expoConfig?.version ?? '?'}`;
+  const b = process.env.EXPO_PUBLIC_BUILD_TIME;
+  return b ? `אתר · עודכן ${new Date(b).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}` : 'אתר';
 }

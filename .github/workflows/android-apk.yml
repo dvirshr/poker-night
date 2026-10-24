@@ -11,6 +11,10 @@ name: Android APK
 # about once a month instead of on every change. The website still updates on every push.
 on:
   workflow_dispatch:
+    inputs:
+      arch:
+        description: 'CPU types (arm64-v8a = every phone from ~2017, about 1/3 of the size; all four = universal)'
+        default: 'arm64-v8a'
 
 permissions:
   contents: write
@@ -76,7 +80,7 @@ jobs:
 
       - name: Build release APK
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=${{ inputs.arch || 'arm64-v8a' }}
 
       - name: Sign with the project keystore
         env:

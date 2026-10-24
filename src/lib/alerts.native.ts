@@ -48,7 +48,7 @@ export async function syncBlindAlerts(gameId: string, gameName: string, upcoming
       identifier: `blind-${gameId}-${u.level.level_no}`,
       content: {
         title: `⏫ עולים בליינדים · רמה ${u.level.level_no}`,
-        body: `\u2066${u.level.small_blind.toLocaleString('he-IL')} / ${u.level.big_blind.toLocaleString('he-IL')}\u2069 · ${gameName}`,
+        body: `סמול ${u.level.small_blind.toLocaleString('he-IL')} · ביג ${u.level.big_blind.toLocaleString('he-IL')} · ${gameName}`, // words, not "50 / 100": Android reverses the numbers in RTL
         sound: 'default',
         priority: N.AndroidNotificationPriority.MAX,
         data: { url: `/game/${gameId}/clock` },

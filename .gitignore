@@ -4,3 +4,4 @@
 *.keystore
 *.jks
 supabase/.temp/
+.expo/

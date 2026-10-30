@@ -49,7 +49,13 @@ export function heError(e: unknown): string {
     [/guest cannot be an admin/i, 'אורח בלי חשבון לא יכול להיות מנהל'],
     [/at least one admin/i, 'בקבוצה חייב להישאר לפחות מנהל אחד'],
     [/cannot unlink yourself/i, 'אי אפשר לנתק את החשבון שלך'],
+    [/account is the banker of an open game/i, 'אתה הבנקאי של ערב פתוח. קודם להעביר את התפקיד או לסגור את הערב'],
+    [/account is the only admin of a group/i, 'אתה המנהל היחיד בקבוצה שיש בה עוד חברים. קודם למנות מנהל נוסף בהגדרות הקבוצה'],
     [/banker of an open game/i, 'השחקן הוא הבנקאי של ערב פתוח. קודם להעביר את התפקיד'],
+    [/Email not confirmed/i, 'צריך לאשר את המייל דרך הקישור שנשלח'],
+    [/For security purposes, you can only request this after|rate limit/i, 'נשלחו יותר מדי בקשות. לנסות שוב בעוד דקה'],
+    [/New password should be different/i, 'הסיסמה החדשה חייבת להיות שונה מהקודמת'],
+    [/Auth session missing|JWT expired|invalid.*token/i, 'הקישור לא תקף או שפג תוקפו. לבקש קישור חדש'],
     [/row-level security/i, 'אין הרשאה לפעולה הזו'],
     [/Failed to fetch|Network request failed/i, 'אין חיבור לשרת'],
   ];

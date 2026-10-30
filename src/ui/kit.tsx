@@ -234,8 +234,9 @@ export function Back({ label = 'חזרה', to }: { label?: string; to?: string }
  * and taps in the first second after the screen opens are ignored, so a double tap on
  * the previous screen's button can never land here.
  */
-export function ConfirmBtn({ title, confirmTitle, message, onConfirm, busy, disabled }: {
+export function ConfirmBtn({ title, confirmTitle, message, onConfirm, busy, disabled, okTitle = 'כן, לסגור', kind }: {
   title: string; confirmTitle: string; message: string; onConfirm: () => void; busy?: boolean; disabled?: boolean;
+  okTitle?: string; kind?: 'primary' | 'ghost' | 'danger';
 }) {
   const [open, setOpen] = useState(false);
   const [armed, setArmed] = useState(false);
@@ -245,7 +246,7 @@ export function ConfirmBtn({ title, confirmTitle, message, onConfirm, busy, disa
   }, []);
   return (
     <>
-      <Btn title={title} onPress={() => armed && setOpen(true)} busy={busy} disabled={disabled} />
+      <Btn title={title} kind={kind} onPress={() => armed && setOpen(true)} busy={busy} disabled={disabled} />
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View style={{ flex: 1, backgroundColor: '#000c', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <View style={{ width: '100%', maxWidth: 420, backgroundColor: C.surf, borderRadius: 20, borderWidth: 1, borderColor: C.line, padding: 20, gap: 14 }}>
@@ -253,7 +254,7 @@ export function ConfirmBtn({ title, confirmTitle, message, onConfirm, busy, disa
             <Txt size={14} muted>{message}</Txt>
             <Row>
               <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => setOpen(false)} />
-              <Btn small title="כן, לסגור" style={{ flex: 2 }} onPress={() => { setOpen(false); onConfirm(); }} />
+              <Btn small kind={kind === 'danger' ? 'danger' : 'primary'} title={okTitle} style={{ flex: 2 }} onPress={() => { setOpen(false); onConfirm(); }} />
             </Row>
           </View>
         </View>

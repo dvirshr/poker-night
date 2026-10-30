@@ -103,7 +103,7 @@ export default function Home() {
         <Row>
           <RefreshBtn onPress={load} />
           <Btn title="❓" kind="ghost" small style={{ paddingHorizontal: 12 }} onPress={() => router.push('/help')} />
-          <Btn title="יציאה" kind="ghost" small style={{ paddingHorizontal: 14 }} onPress={() => supabase.auth.signOut()} />
+          <Btn title="👤" kind="ghost" small style={{ paddingHorizontal: 12 }} onPress={() => router.push('/account')} />
         </Row>
       </Row>
       <ErrorBar text={err} onClose={() => setErr(null)} />

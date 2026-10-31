@@ -59,6 +59,14 @@
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#F5A524"
         }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#111215",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160
+        }
       ]
     ],
     "scheme": "pokernight",

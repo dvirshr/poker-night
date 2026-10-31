@@ -13,6 +13,11 @@ import type { ErrorBoundaryProps } from 'expo-router';
 import { captureInviteFromUrl } from '../lib/invite';
 import { useAlertTaps } from '../lib/alerts';
 import { VersionGate } from '../ui/VersionGate';
+import { Splash } from '../ui/Splash';
+import * as SplashScreen from 'expo-splash-screen';
+import { View } from 'react-native';
+
+void SplashScreen.preventAutoHideAsync().catch(() => {}); // keep the native splash until the animated one is drawn
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.dir = 'rtl';
@@ -47,10 +52,14 @@ export default function Root() {
     return () => clearTimeout(t);
   }, []);
   const ready = fonts || !!fontError || gaveUp;
+  const [intro, setIntro] = useState(true);
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <AuthProvider>{ready ? <VersionGate><Gate /></VersionGate> : <Loading />}</AuthProvider>
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <AuthProvider>{ready ? <VersionGate><Gate /></VersionGate> : null}</AuthProvider>
+        {intro && <Splash ready={ready} onDone={() => setIntro(false)} />}
+      </View>
     </SafeAreaProvider>
   );
 }

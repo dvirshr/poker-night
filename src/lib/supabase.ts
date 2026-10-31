@@ -10,9 +10,12 @@ const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local');
 
+const appHeaders: Record<string, string> = Platform.OS === 'web' ? {} : { 'x-app-version': APP_VERSION, 'x-app-platform': Platform.OS };
+
 export const supabase = createClient(url, key, {
   // the server may refuse versions the operator no longer supports (see app_config / check_request)
-  global: { headers: Platform.OS === 'web' ? { 'x-app-platform': 'web' } : { 'x-app-version': APP_VERSION, 'x-app-platform': Platform.OS } },
+  // the website sends nothing extra (a custom header would need CORS); browsers are recognised by their Origin
+  global: { headers: appHeaders },
   auth: {
     storage: localStorage,
     autoRefreshToken: true,

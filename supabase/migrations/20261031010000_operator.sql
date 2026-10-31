@@ -62,7 +62,7 @@ grant execute on function public.admin_stats() to authenticated;
 -- 2. Version control: which app versions may use the server
 -- =====================================================================
 -- One row, edited from the dashboard. Installed apps send their version in the x-app-version header
--- (the Android APK is 0.1.<build number>); the website sends x-app-platform: web.
+-- (the Android APK is 0.1.<build number>). The website sends no extra header (no CORS change needed).
 create table if not exists public.app_config (
   id            boolean primary key default true check (id),
   min_version   text    not null default '0.0.0',   -- versions below this are blocked (when enforce = true)
@@ -98,8 +98,9 @@ declare
 begin
   select * into cfg from app_config where id;
   if not found or not cfg.enforce then return; end if;
-  -- the website always runs the latest build (a reload brings it), so only installed apps are checked
-  if current_setting('request.headers', true)::json->>'x-app-platform' = 'web' then return; end if;
+  -- the website always runs the latest build (a reload brings it), so only installed apps are checked.
+  -- Browsers always send Origin; the installed app never does.
+  if coalesce(current_setting('request.headers', true)::json->>'origin', '') <> '' then return; end if;
   v := nullif(btrim(coalesce(current_setting('request.headers', true)::json->>'x-app-version', '')), '');
   if (v is null and not cfg.allow_legacy) or (v is not null and version_lt(v, cfg.min_version)) then
     raise sqlstate 'PGRST' using

@@ -28,7 +28,7 @@ reset role;
 update public.app_config set allow_legacy = false;
 set role authenticated;
 select test.fails('select public.check_request()', 'no longer supported', 'legacy app blocked once allow_legacy is off');
-select set_config('request.headers', '{"x-app-platform":"web"}', false);
+select set_config('request.headers', '{"origin":"https://dvirshr.github.io"}', false);
 select public.check_request();
 select test.ok(true, 'the website is never blocked (always the latest build)');
 select set_config('request.headers', 'not json', false);

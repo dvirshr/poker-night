@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import { supabase, heError, APP_VERSION } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -64,7 +64,7 @@ export default function Account() {
         <Btn kind="ghost" title="פרטיות ותנאי שימוש" onPress={() => router.push('/privacy')} />
         {operator && <Btn kind="ghost" title="🛠 ניהול מערכת" onPress={() => router.push('/admin')} />}
       </View>
-      <Txt muted size={11} center style={{ marginTop: 10 }}>{`גרסה ${APP_VERSION}`}</Txt>
+      <Txt muted size={11} center style={{ marginTop: 10 }}>{Platform.OS === 'web' ? 'אתר · תמיד הגרסה האחרונה' : `אנדרואיד · גרסה ${APP_VERSION}`}</Txt>
 
       <Card style={{ gap: 8, marginTop: 28, borderColor: C.danger }}>
         <Txt weight="bold" size={16} color={C.danger}>מחיקת חשבון</Txt>

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, Share, Switch, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { supabase, heError } from '../../lib/supabase';
@@ -171,7 +171,7 @@ export default function Group() {
           { v: 'league', t: 'טבלת ליגה' },
           { v: 'month', t: 'חודשי ושנתי' },
           { v: 'history', t: 'היסטוריה' },
-          ...(hostingOn ? [{ v: 'hosting' as const, t: '🏠 אירוח' }] : []),
+          ...(hostingOn ? [{ v: 'hosting' as const, t: '🏠 סבב מארחים' }] : []),
           { v: 'members', t: 'שחקנים' },
           ...(isAdmin ? [{ v: 'settings' as const, t: 'הגדרות' }] : []),
         ]}
@@ -452,17 +452,9 @@ export default function Group() {
       {tab === 'settings' && isAdmin && group && (
         <View style={{ gap: 12 }}>
           <Card style={{ gap: 8 }}>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Txt weight="bold" size={16}>🏠 סבב אירוח</Txt>
-              <Switch
-                value={hostingOn}
-                onValueChange={v => run(() => supabase.from('groups').update({ hosting_enabled: v }).eq('id', id))}
-                trackColor={{ true: C.acc, false: C.line }}
-                thumbColor={C.text}
-                accessibilityLabel="סבב אירוח"
-              />
-            </Row>
-            {!hostingOn && <Txt muted size={12}>מארחים בתורות? מפעילים, קובעים סדר, והאפליקציה תציע בכל ערב את הבא בתור.</Txt>}
+            <Txt weight="bold" size={16}>🏠 סבב מארחים</Txt>
+            <Seg value={hostingOn ? 1 : 0} onChange={v => run(() => supabase.from('groups').update({ hosting_enabled: v === 1 }).eq('id', id))}
+              options={[{ v: 0, t: 'כבוי' }, { v: 1, t: 'פעיל' }]} />
             {hostingOn && (
               <>
                 <Txt muted size={12}>הסדר שבו מארחים. בפתיחת ערב, הבא בתור מסומן אוטומטית כמארח (אפשר לשנות).</Txt>

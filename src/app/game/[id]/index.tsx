@@ -8,7 +8,7 @@ import { useKeyboardInset } from '../../../lib/useKeyboardInset';
 import { useGame, type Row as Entry } from '../../../lib/useGame';
 import { chipsToIls } from '../../../core/settle';
 import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
-import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap } from '../../../ui/kit';
+import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap, ConfirmBtn } from '../../../ui/kit';
 import { ClockBar } from '../../../ui/tournament';
 import { DealerDraw } from '../../../ui/DealerDraw';
 import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
@@ -57,6 +57,18 @@ export default function Table() {
   }, [g.rows]);
 
   if (!g.loaded || !game) return <Loading />;
+  if (game.status === 'cancelled') {
+    return (
+      <Screen>
+        <Back label="לקבוצה" to={`/group/${game.group_id}`} />
+        <Card style={{ gap: 8, marginTop: 12 }}>
+          <Txt size={22} weight="black">{`${game.name} · בוטל`}</Txt>
+          <Txt muted size={14}>הערב בוטל ולא נספר בליגה ובסטטיסטיקות. כל הרישומים נשמרו ביומן.</Txt>
+          <Btn small kind="ghost" title="📜 יומן הערב" onPress={() => router.push(`/game/${id}/log`)} />
+        </Card>
+      </Screen>
+    );
+  }
 
   const nameOf = (pid: string) => g.seats.find(s => s.player_id === pid)?.display_name ?? '';
   const tot = (pid: string) => g.totals.find(t => t.playerId === pid)!;
@@ -232,6 +244,23 @@ export default function Table() {
         <Btn small kind="ghost" title="📜 יומן הערב" style={{ flex: 1 }} onPress={() => router.push(`/game/${id}/log`)} />
         <Btn small kind="ghost" title="🎨 עיצוב שולחן" style={{ flex: 1 }} onPress={() => setStyling(true)} />
       </Row>
+      {(g.isBanker || g.isAdmin) && (
+        <View style={{ marginTop: 24 }}>
+          <ConfirmBtn
+            kind="danger"
+            title="ביטול הערב"
+            confirmTitle="לבטל את הערב?"
+            message={`"${game.name}" לא ייספר בליגה ובסטטיסטיקות, ואי אפשר יהיה להמשיך לרשום בו. שום רישום לא נמחק: הכול נשאר ביומן. מתאים לערב שנפתח בטעות. אי אפשר לבטל את הביטול.`}
+            okTitle="כן, לבטל"
+            disabled={g.unsynced > 0}
+            onConfirm={async () => {
+              const { error } = await supabase.rpc('cancel_game', { p_game: id });
+              if (error) return g.setError(heError(error));
+              router.replace(`/group/${game.group_id}`);
+            }}
+          />
+        </View>
+      )}
       <HostPicker open={hostPick} onClose={() => setHostPick(false)} groupId={game.group_id} current={game.host_player_id ?? null}
         onPick={async pid => {
           const { error } = await supabase.from('games').update({ host_player_id: pid }).eq('id', id);

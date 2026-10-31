@@ -31,7 +31,7 @@ export default function Home() {
     if (!userId) return;
     const [m, g, p] = await Promise.all([
       supabase.from('players').select('id, role, status, group_id, groups(name)').eq('profile_id', userId).neq('status', 'left'),
-      supabase.from('games').select('id, name, status, group_id').neq('status', 'closed').order('created_at', { ascending: false }),
+      supabase.from('games').select('id, name, status, group_id').in('status', ['open', 'counting']).order('created_at', { ascending: false }),
       supabase.from('profiles').select('display_name').eq('id', userId).single(),
     ]);
     if (m.error) setErr(heError(m.error));

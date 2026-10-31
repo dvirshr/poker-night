@@ -20,7 +20,7 @@ export type Game = {
   rebuy_policy: 'all_night' | 'until_time' | 'none';
   rebuy_until: string | null;
   quick_rebuys: number[];
-  status: 'open' | 'counting' | 'closed';
+  status: 'open' | 'counting' | 'closed' | 'cancelled';
   banker_profile_id: string;
   closed_at: string | null;
   payout_pct: number[] | null;

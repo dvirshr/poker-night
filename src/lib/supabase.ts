@@ -34,6 +34,8 @@ export function heError(e: unknown): string {
     [/rebuy window has closed/i, 'זמן הריבאי הסתיים'],
     [/rebuys are not allowed/i, 'במשחק הזה אין כניסות חוזרות'],
     [/no buy-ins once counting/i, 'אי אפשר להוסיף כניסות אחרי שהספירה התחילה'],
+    [/game is cancelled/i, 'הערב בוטל ולא ניתן לשינוי'],
+    [/only the banker or a group admin can cancel/i, 'רק הבנקאי או מנהל הקבוצה יכולים לבטל ערב'],
     [/game is closed/i, 'הערב סגור ולא ניתן לשינוי'],
     [/pot is not balanced/i, 'הקופה לא מאוזנת'],
     [/every player must be counted/i, 'צריך לספור את כל השחקנים'],

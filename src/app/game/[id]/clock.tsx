@@ -54,7 +54,7 @@ export default function Clock() {
 
   if (!g.loaded || !g.game) return <Loading />;
   const game = g.game;
-  const closed = game.status === 'closed';
+  const closed = game.status === 'closed' || game.status === 'cancelled';
   const act = clockActions(game, g.levels, m => g.setError(m), () => void g.reload());
   const pct = c.levelMs ? 1 - c.remainingMs / c.levelMs : 0;
   const warn = c.started && !c.paused && c.remainingMs <= 60_000 && !c.over;

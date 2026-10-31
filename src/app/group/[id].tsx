@@ -56,7 +56,7 @@ export default function Group() {
   const me = players.find(p => p.profile_id === userId);
   const isAdmin = me?.role === 'admin';
   const canOpen = group?.banker_mode === 'opener_is_banker' || isAdmin;
-  const open = games.find(g => g.status !== 'closed');
+  const open = games.find(g => g.status === 'open' || g.status === 'counting');
   const active = players.filter(p => p.status === 'active');
   const pendingList = players.filter(p => p.status === 'pending');
   const hostingOn = !!group?.hosting_enabled;

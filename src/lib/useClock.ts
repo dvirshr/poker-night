@@ -10,7 +10,7 @@ const iso = (t: number | null) => (t == null ? null : new Date(t).toISOString())
 /** Live clock picture, re-rendered every second while running. */
 export function useClock(game: Game | null, levels: Level[]) {
   const [now, setNow] = useState(Date.now());
-  const running = !!game?.clock_anchor && !game?.clock_paused_at && game?.status !== 'closed';
+  const running = !!game?.clock_anchor && !game?.clock_paused_at && game?.status !== 'closed' && game?.status !== 'cancelled';
   useEffect(() => {
     setNow(Date.now());
     if (!running) return;
@@ -71,7 +71,7 @@ export function useAlertPref(gameId: string, isBanker: boolean) {
 export function useBlindAlertsSync(game: Game | null, levels: Level[], on: boolean) {
   const anchor = game?.clock_anchor ?? null;
   const paused = game?.clock_paused_at ?? null;
-  const closed = game?.status === 'closed';
+  const closed = game?.status === 'closed' || game?.status === 'cancelled';
   const sig = levels.map(l => `${l.level_no}:${l.small_blind}:${l.big_blind}:${l.duration_min}`).join(',');
   useEffect(() => {
     if (!game || game.game_type !== 'tournament') return;

@@ -61,7 +61,7 @@ export default function Reset() {
   return (
     <Screen>
       <View style={{ height: 40 }} />
-      <H1 sub="איפוס סיסמה">ערב פוקר</H1>
+      <H1 sub="איפוס סיסמה">דילר</H1>
       <ErrorBar text={err} onClose={() => setErr(null)} />
       {stage === 'loading' && <Txt muted>בודק את הקישור…</Txt>}
       {stage === 'bad' && (

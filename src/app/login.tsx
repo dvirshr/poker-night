@@ -73,7 +73,7 @@ export default function Login() {
   return (
     <Screen>
       <View style={{ height: 40 }} />
-      <H1 sub="ניהול ערב פוקר: קופה, כניסות, ספירה והתחשבנות">ערב פוקר</H1>
+      <H1 sub="ניהול ערב פוקר: קופה, כניסות, ספירה והתחשבנות">דילר</H1>
       <Seg value={mode as 'in' | 'up'} onChange={setMode} options={[{ v: 'in', t: 'התחברות' }, { v: 'up', t: 'הרשמה' }]} />
       {invited && (
         <Card accent style={{ marginBottom: 14 }}>

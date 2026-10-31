@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ערב פוקר",
+    "name": "דילר",
     "slug": "poker-night",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,8 +32,8 @@
       "favicon": "./public/favicon.png",
       "bundler": "metro",
       "output": "single",
-      "name": "ערב פוקר",
-      "shortName": "פוקר",
+      "name": "דילר",
+      "shortName": "דילר",
       "lang": "he",
       "dir": "rtl",
       "backgroundColor": "#111215",

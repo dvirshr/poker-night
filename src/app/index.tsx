@@ -103,7 +103,7 @@ export default function Home() {
   return (
     <Screen>
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <H1 sub={me ? `שלום ${me}` : undefined}>ערב פוקר</H1>
+        <H1 sub={me ? `שלום ${me}` : undefined}>דילר</H1>
         <Row>
           <RefreshBtn onPress={load} />
           <Btn title="❓" kind="ghost" small style={{ paddingHorizontal: 12 }} onPress={() => router.push('/help')} />

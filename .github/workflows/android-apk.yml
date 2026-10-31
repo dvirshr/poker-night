@@ -111,4 +111,4 @@ jobs:
           TAG="v0.1.${{ github.run_number }}"
           # the app reads this text for its "new version" banner: one line per item
           printf '%s\n%s\n' "$IMPORTANT" "$NOTES" | sed '/^$/d' > notes.txt
-          gh release create "$TAG" poker-night.apk --title "ערב פוקר $TAG" --notes-file notes.txt --latest
+          gh release create "$TAG" poker-night.apk --title "דילר $TAG" --notes-file notes.txt --latest

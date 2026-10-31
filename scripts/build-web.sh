@@ -18,13 +18,13 @@ head = '''
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="פוקר">
+<meta name="apple-mobile-web-app-title" content="דילר">
 <link rel="apple-touch-icon" href="/poker-night/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="/poker-night/favicon.png">
-<meta name="description" content="ניהול ערב פוקר לחבר'ה: קופה, כניסות, ספירה והתחשבנות. בלי פרטי תשלום.">
+<meta name="description" content="דילר: ניהול ערב פוקר לחבר'ה: קופה, כניסות, ספירה והתחשבנות. בלי פרטי תשלום.">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="ערב פוקר">
-<meta property="og:title" content="ערב פוקר · הוזמנת לקבוצה">
+<meta property="og:site_name" content="דילר">
+<meta property="og:title" content="דילר · הוזמנת לקבוצת פוקר">
 <meta property="og:description" content="קופה, כניסות, ספירה והתחשבנות לחבר'ה. נרשמים עם שם, מייל וסיסמה. בלי פרטי תשלום.">
 <meta property="og:url" content="https://dvirshr.github.io/poker-night/">
 <meta property="og:image" content="https://dvirshr.github.io/poker-night/og.png">

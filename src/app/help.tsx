@@ -40,7 +40,7 @@ export default function Help() {
         ))}
       </View>
       <Btn small kind="ghost" title="שיתוף המדריך בוואטסאפ" style={{ marginTop: 14 }}
-        onPress={() => void Share.share({ message: `🃏 ערב פוקר · איך זה עובד (בלי הרשמה):\n${WEB_LINK}/help${tab === 'player' ? '' : `?role=${tab}`}` })} />
+        onPress={() => void Share.share({ message: `🃏 דילר · ערב פוקר · איך זה עובד (בלי הרשמה):\n${WEB_LINK}/help${tab === 'player' ? '' : `?role=${tab}`}` })} />
     </Screen>
   );
 }

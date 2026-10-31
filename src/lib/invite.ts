@@ -18,7 +18,7 @@ export function clearPendingInvite() {
 
 export function inviteMessage(groupName: string, code: string) {
   return [
-    `🃏 הוזמנת לקבוצת הפוקר "${groupName}"`,
+    `🃏 הוזמנת לקבוצת הפוקר "${groupName}" בדילר`,
     '',
     '1. להיכנס לקישור (האתר של האפליקציה, דרך GitHub):',
     inviteLink(code),

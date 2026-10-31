@@ -47,6 +47,8 @@ export function heError(e: unknown): string {
     [/no buy-ins once counting/i, 'אי אפשר להוסיף כניסות אחרי שהספירה התחילה'],
     [/game is cancelled/i, 'הערב בוטל ולא ניתן לשינוי'],
     [/only the banker or a group admin can cancel/i, 'רק הבנקאי או מנהל הקבוצה יכולים לבטל ערב'],
+    [/group is archived/i, 'הקבוצה בארכיון או נמחקה. מנהל יכול להחזיר אותה בהגדרות'],
+    [/group has an open game/i, 'יש בקבוצה ערב פתוח. קודם לסגור או לבטל אותו'],
     [/game is closed/i, 'הערב סגור ולא ניתן לשינוי'],
     [/pot is not balanced/i, 'הקופה לא מאוזנת'],
     [/every player must be counted/i, 'צריך לספור את כל השחקנים'],

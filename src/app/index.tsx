@@ -10,7 +10,7 @@ import { C } from '../lib/theme';
 import { pendingInvite, clearPendingInvite } from '../lib/invite';
 import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge , RefreshBtn, useOnResume } from '../ui/kit';
 
-type Membership = { id: string; role: string; status: string; group_id: string; groups: { name: string } | null };
+type Membership = { id: string; role: string; status: string; group_id: string; groups: { name: string; archived_at: string | null; deleted_at: string | null } | null };
 type OpenGame = { id: string; name: string; status: string; group_id: string };
 
 export default function Home() {
@@ -25,12 +25,13 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [showOld, setShowOld] = useState(false);
   const [retry, setRetry] = useState<{ code: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!userId) return;
     const [m, g, p] = await Promise.all([
-      supabase.from('players').select('id, role, status, group_id, groups(name)').eq('profile_id', userId).neq('status', 'left'),
+      supabase.from('players').select('id, role, status, group_id, groups(name, archived_at, deleted_at)').eq('profile_id', userId).neq('status', 'left'),
       supabase.from('games').select('id, name, status, group_id').in('status', ['open', 'counting']).order('created_at', { ascending: false }),
       supabase.from('profiles').select('display_name').eq('id', userId).single(),
     ]);
@@ -48,7 +49,7 @@ export default function Home() {
       } else if (error) setErr(heError(error));
       else {
         setNotice('ביקשת להצטרף לקבוצה. מחכים לאישור המנהל.');
-        const again = await supabase.from('players').select('id, role, status, group_id, groups(name)').eq('profile_id', userId).neq('status', 'left');
+        const again = await supabase.from('players').select('id, role, status, group_id, groups(name, archived_at, deleted_at)').eq('profile_id', userId).neq('status', 'left');
         setGroups((again.data ?? []) as unknown as Membership[]);
       }
     }
@@ -94,6 +95,9 @@ export default function Home() {
     void load();
   };
 
+  // archived groups go to the bottom; deleted groups are shown only to their admins (to restore)
+  const liveGroups = groups.filter(g => g.status === 'pending' || (!g.groups?.archived_at && !g.groups?.deleted_at));
+  const oldGroups = groups.filter(g => g.status !== 'pending' && (g.groups?.deleted_at ? g.role === 'admin' : !!g.groups?.archived_at));
   const groupName = (id: string) => groups.find(g => g.group_id === id)?.groups?.name ?? '';
 
   return (
@@ -139,8 +143,8 @@ export default function Home() {
 
       <Txt weight="bold" size={16} style={{ marginBottom: 10 }}>הקבוצות שלי</Txt>
       <View style={{ gap: 10, marginBottom: 20 }}>
-        {groups.length === 0 && <Txt muted>עוד אין קבוצות. פתח קבוצה חדשה או הצטרף עם קוד הזמנה.</Txt>}
-        {groups.map(g =>
+        {liveGroups.length === 0 && <Txt muted>עוד אין קבוצות. פתח קבוצה חדשה או הצטרף עם קוד הזמנה.</Txt>}
+        {liveGroups.map(g =>
           g.status === 'pending' ? (
             <Card key={g.id}>
               <Txt weight="bold">ממתין לאישור מנהל</Txt>
@@ -156,6 +160,21 @@ export default function Home() {
           ),
         )}
       </View>
+
+      {oldGroups.length > 0 && (
+        <View style={{ gap: 8, marginBottom: 20 }}>
+          <Btn small kind="ghost" title={`${showOld ? '▾' : '▸'} ארכיון וקבוצות שנמחקו (${oldGroups.length})`} onPress={() => setShowOld(v => !v)} />
+          {showOld && oldGroups.map(g => (
+            <Card key={g.id} onPress={() => router.push(`/group/${g.group_id}`)} style={{ opacity: 0.75 }}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Txt weight="bold" size={16}>{g.groups?.name}</Txt>
+                <Badge text={g.groups?.deleted_at ? 'נמחקה' : 'בארכיון'} />
+              </Row>
+              {g.groups?.deleted_at && <Txt muted size={12}>רק מנהלי הקבוצה רואים אותה. אפשר לשחזר מההגדרות.</Txt>}
+            </Card>
+          ))}
+        </View>
+      )}
 
       {panel === 'none' && (
         <View style={{ gap: 10 }}>

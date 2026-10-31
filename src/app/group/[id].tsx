@@ -10,7 +10,7 @@ import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
 import { hostTable } from '../../core/hosting';
 import { monthName, periods, byKind, type Standing, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
 import { THEMES, type ThemeKey } from '../../lib/theme';
-import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume } from '../../ui/kit';
+import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume, ConfirmBtn } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
 type Game = { id: string; name: string; status: string; played_on: string; created_at: string; game_type?: string; host_player_id?: string | null };
@@ -19,7 +19,9 @@ type League = { player_id: string; display_name: string; games_played: number; n
 export default function Group() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { userId } = useAuth();
-  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey; hosting_enabled?: boolean; host_rotation?: string[] } | null>(null);
+  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey; hosting_enabled?: boolean; host_rotation?: string[]; archived_at?: string | null; deleted_at?: string | null } | null>(null);
+  const [gname, setGname] = useState('');
+  const [myName, setMyName] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [league, setLeague] = useState<League[]>([]);
@@ -55,7 +57,8 @@ export default function Group() {
 
   const me = players.find(p => p.profile_id === userId);
   const isAdmin = me?.role === 'admin';
-  const canOpen = group?.banker_mode === 'opener_is_banker' || isAdmin;
+  const frozen = !!group?.archived_at || !!group?.deleted_at;
+  const canOpen = !frozen && (group?.banker_mode === 'opener_is_banker' || isAdmin);
   const open = games.find(g => g.status === 'open' || g.status === 'counting');
   const active = players.filter(p => p.status === 'active');
   const pendingList = players.filter(p => p.status === 'pending');
@@ -87,6 +90,14 @@ export default function Group() {
       </Row>
       <H1 sub={`${active.length} שחקנים${isAdmin ? ' · אתה מנהל' : ''}`}>{group?.name ?? ''}</H1>
       <ErrorBar text={err} onClose={() => setErr(null)} />
+      {frozen && (
+        <Card style={{ marginBottom: 12, gap: 4, borderWidth: 1, borderColor: group?.deleted_at ? C.danger : C.line }}>
+          <Txt weight="bold">{group?.deleted_at ? '🗑 הקבוצה נמחקה' : '📦 הקבוצה בארכיון'}</Txt>
+          <Txt muted size={13}>{group?.deleted_at
+            ? 'רק המנהלים רואים אותה. כל ההיסטוריה שמורה, ואפשר לשחזר בלשונית "הגדרות".'
+            : 'ההיסטוריה והליגה זמינות לצפייה. אין פתיחת ערבים והצטרפות חדשה. מנהל יכול להחזיר אותה בלשונית "הגדרות".'}</Txt>
+        </Card>
+      )}
 
       {open ? (
         <Card accent onPress={() => router.push(`/game/${open.id}`)} style={{ marginBottom: 16 }}>
@@ -99,7 +110,7 @@ export default function Group() {
       ) : (
         <View style={{ marginBottom: 16, gap: 6 }}>
           <Btn title="+ ערב חדש" onPress={() => router.push({ pathname: '/game/new', params: { group: id } })} disabled={!canOpen} />
-          {!canOpen && <Txt muted size={12}>בקבוצה הזו רק מנהל פותח ערב וממנה בנקאי</Txt>}
+          {!canOpen && !frozen && <Txt muted size={12}>בקבוצה הזו רק מנהל פותח ערב וממנה בנקאי</Txt>}
         </View>
       )}
 
@@ -355,6 +366,21 @@ export default function Group() {
 
       {tab === 'members' && (
         <View style={{ gap: 6 }}>
+          {me && !isAdmin && !frozen && (
+            myName == null ? (
+              <Btn small kind="ghost" title="✎ שינוי השם שלי בקבוצה" onPress={() => setMyName(me.display_name)} />
+            ) : (
+              <Card style={{ gap: 6, borderWidth: 1, borderColor: C.line }}>
+                <Field label="השם שלי בקבוצה" value={myName} onChangeText={setMyName} maxLength={40} />
+                <Row>
+                  <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => setMyName(null)} />
+                  <Btn small title="שמירה" style={{ flex: 2 }} disabled={!myName.trim() || myName.trim() === me.display_name}
+                    onPress={() => run(async () => { const r = await supabase.rpc('rename_me', { p_group: id, p_name: myName }); if (!r.error) setMyName(null); return r; })} />
+                </Row>
+                <Txt muted size={11}>ההיסטוריה נשמרת. השם מתעדכן בכל הערבים והליגה.</Txt>
+              </Card>
+            )
+          )}
           {active.map(p => (
             <View key={p.id} style={{ gap: 6 }}>
               <Card onPress={() => router.push(`/player/${id}/${p.id}`)} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12 }}>
@@ -451,6 +477,41 @@ export default function Group() {
 
       {tab === 'settings' && isAdmin && group && (
         <View style={{ gap: 12 }}>
+          <Card style={{ gap: 8 }}>
+            <Txt weight="bold" size={16}>הקבוצה</Txt>
+            {!group.deleted_at && (
+              <>
+                <Field label="שם הקבוצה" value={gname || group.name} onChangeText={setGname} maxLength={60} />
+                <Btn small title="שמירת שם" disabled={!gname.trim() || gname.trim() === group.name}
+                  onPress={() => run(async () => { const r = await supabase.from('groups').update({ name: gname.trim() }).eq('id', id); if (!r.error) setGname(''); return r; })} />
+              </>
+            )}
+            <View style={{ height: 6 }} />
+            {group.deleted_at ? (
+              <Btn small title="♻ שחזור הקבוצה" onPress={() => run(() => supabase.rpc('set_group_state', { p_group: id, p_action: 'restore' }))} />
+            ) : group.archived_at ? (
+              <Btn small kind="ghost" title="📤 החזרה מהארכיון" onPress={() => run(() => supabase.rpc('set_group_state', { p_group: id, p_action: 'unarchive' }))} />
+            ) : (
+              <>
+                <Btn small kind="ghost" title="📦 העברה לארכיון" disabled={!!open} onPress={() => run(() => supabase.rpc('set_group_state', { p_group: id, p_action: 'archive' }))} />
+                <Txt muted size={11}>ארכיון: הקבוצה יורדת לתחתית הרשימה של כולם. ההיסטוריה זמינה, בלי ערבים חדשים. אפשר להחזיר בכל רגע.</Txt>
+              </>
+            )}
+            {!group.deleted_at && (
+              <View style={{ marginTop: 8 }}>
+                <ConfirmBtn
+                  kind="danger"
+                  title="🗑 מחיקת הקבוצה"
+                  confirmTitle={`למחוק את "${group.name}"?`}
+                  message="הקבוצה תיעלם מהרשימה של כל החברים. שום נתון לא נמחק: ערבים, ליגה והתחשבנות נשמרים, ומנהל יכול לשחזר אותה בכל רגע."
+                  okTitle="כן, למחוק"
+                  disabled={!!open}
+                  onConfirm={() => void run(() => supabase.rpc('set_group_state', { p_group: id, p_action: 'delete' }))}
+                />
+              </View>
+            )}
+            {!!open && <Txt muted size={11}>יש ערב פתוח: קודם לסגור או לבטל אותו.</Txt>}
+          </Card>
           <Card style={{ gap: 8 }}>
             <Txt weight="bold" size={16}>🏠 סבב מארחים</Txt>
             <Seg value={hostingOn ? 1 : 0} onChange={v => run(() => supabase.from('groups').update({ hosting_enabled: v === 1 }).eq('id', id))}

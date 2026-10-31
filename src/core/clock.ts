@@ -85,6 +85,64 @@ export function makeStructure(startSmall: number, minutes: number, count: number
   return LADDER.slice(0, n).map((u, i) => ({ level_no: i + 1, small_blind: u * startSmall, big_blind: u * startSmall * 2, duration_min: minutes }));
 }
 
+// small blinds that are easy to make with chips: 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50, 60, 75, 80, 100, ...
+const NICE_SB: number[] = (() => {
+  const out = new Set<number>();
+  for (let k = 0; k <= 6; k++) for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 8]) {
+    const v = m * 10 ** k;
+    if (Number.isInteger(v)) out.add(v);
+  }
+  return [...out].sort((a, b) => a - b);
+})();
+const niceAtLeast = (x: number, above: number) => NICE_SB.find(v => v >= x && v > above) ?? NICE_SB.find(v => v > above)!;
+const niceNear = (x: number, above: number) => {
+  const c = NICE_SB.filter(v => v > above);
+  return c.reduce((best, v) => (Math.abs(Math.log(v / x)) < Math.abs(Math.log(best / x)) ? v : best), c[0]);
+};
+
+export interface Pace { stack: number; players: number; hours: number; minutes: number; rebuys?: boolean }
+
+/**
+ * Blind structure tied to the actual game: starting stack, number of players and how long the night should run.
+ *  - start: big blind ≈ 1/100 of the starting stack (100 big blinds each)
+ *  - planned end: big blind ≈ 1/20 of all chips on the table, so the last players are short and must play
+ *  - geometric steps in between, rounded to chip-friendly values; 4 spare levels in case it runs long
+ */
+export function autoStructure({ stack, players, hours, minutes, rebuys }: Pace): Level[] {
+  const planned = Math.max(4, Math.round((hours * 60) / minutes));
+  const sb0 = niceAtLeast(Math.max(1, stack / 200), 0);
+  const chips = stack * Math.max(2, players) * (rebuys ? 1.5 : 1);
+  const sbEnd = Math.max(sb0 * 4, chips / 40);
+  const r = Math.max(1.15, (sbEnd / sb0) ** (1 / (planned - 1)));
+  const out: Level[] = [];
+  let prev = 0;
+  for (let i = 0; i < planned + 4; i++) {
+    const sb = i === 0 ? sb0 : niceNear(sb0 * r ** i, prev);
+    out.push({ level_no: i + 1, small_blind: sb, big_blind: sb * 2, duration_min: minutes });
+    prev = sb;
+  }
+  return out;
+}
+
+/** Plain-language summary of a structure against the stack, for the setup screen. */
+export function paceInfo(levels: Level[], stack: number, plannedMin: number) {
+  const first = levels[0];
+  const starts = levelStarts(levels);
+  let at = 0;
+  for (let i = 0; i < levels.length; i++) if (starts[i] < plannedMin * 60_000) at = i;
+  return {
+    startDepth: first ? Math.round(stack / first.big_blind) : 0,
+    atEnd: levels[at],
+    totalMin: levels.reduce((s, l) => s + l.duration_min, 0),
+  };
+}
+
+/** Average stack of the players still in, in big blinds: the live "pace" of a tournament. */
+export function averageStackBB(entries: number, stack: number, alive: number, bigBlind: number): number | null {
+  if (alive <= 0 || bigBlind <= 0 || entries <= 0) return null;
+  return Math.round((entries * stack) / alive / bigBlind);
+}
+
 /**
  * Finish order from eliminations: players still in first (seat order), then the
  * eliminated ones, last out first. The banker can reorder before closing.

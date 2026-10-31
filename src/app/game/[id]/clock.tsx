@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { supabase, heError } from '../../../lib/supabase';
 import { useGame } from '../../../lib/useGame';
 import { useClock, clockActions, useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
-import { mmss, type Level } from '../../../core/clock';
+import { mmss, averageStackBB, type Level } from '../../../core/clock';
 import { C, blinds } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Loading } from '../../../ui/kit';
 import { BlindEditor, levelsValid } from '../../../ui/tournament';
@@ -82,6 +82,22 @@ export default function Clock() {
           <View style={{ height: 8, borderRadius: 4, backgroundColor: C.surf, overflow: 'hidden', marginBottom: 14 }}>
             <View style={{ width: `${Math.round(pct * 100)}%`, height: 8, backgroundColor: warn ? C.neg : C.acc, alignSelf: 'flex-start' }} />
           </View>
+          {(() => {
+            const reversed = new Set(g.rows.filter(r => r.type === 'reversal').map(r => r.reverses_entry_id));
+            const entries = g.rows.filter(r => (r.type === 'buy_in' || r.type === 'rebuy') && !reversed.has(r.id)).length;
+            const alive = g.seats.filter(x => !x.eliminated_at).length;
+            const stack = game.start_stack_chips ?? 0;
+            const avg = c.level ? averageStackBB(entries, stack, alive, c.level.big_blind) : null;
+            if (avg == null || closed) return null;
+            const tone = avg <= 10 ? C.neg : avg <= 20 ? C.acc : C.pos;
+            return (
+              <Card style={{ alignItems: 'center', marginBottom: 14, gap: 2 }}>
+                <Txt muted size={13} center>{`סטאק ממוצע · ${alive} שחקנים במשחק`}</Txt>
+                <Num weight="black" size={26} center color={tone}>{`${Math.round((entries * stack) / Math.max(alive, 1)).toLocaleString('he-IL')} · ${avg} ביג`}</Num>
+                <Txt muted size={12} center>{avg <= 10 ? 'סטאקים קצרים: אפשר להאט (+דקות)' : avg >= 40 ? 'עמוק: אפשר להאיץ (רמה הבאה)' : 'קצב תקין'}</Txt>
+              </Card>
+            );
+          })()}
           {c.next && (
             <Card style={{ alignItems: 'center', marginBottom: 14 }}>
               <Txt muted size={13} center>הרמה הבאה</Txt>

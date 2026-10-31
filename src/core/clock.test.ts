@@ -82,3 +82,41 @@ test('mm:ss', () => {
   assert.equal(mmss(61_001), '1:02');
   assert.equal(mmss(3_725_000), '1:02:05');
 });
+
+import { autoStructure, paceInfo, averageStackBB } from './clock.ts';
+
+test('auto structure: 6 players × 5000, 3 hours, 20-minute levels', () => {
+  const l = autoStructure({ stack: 5000, players: 6, hours: 3, minutes: 20 });
+  assert.equal(l.length, 9 + 4);
+  assert.deepEqual([l[0].small_blind, l[0].big_blind], [25, 50]); // 100 big blinds each
+  for (let i = 1; i < l.length; i++) assert.ok(l[i].small_blind > l[i - 1].small_blind, 'strictly rising');
+  assert.ok(l.every(x => x.big_blind === 2 * x.small_blind && x.duration_min === 20));
+  // at the planned end (level 9) the big blind is about 1/20 of all 30,000 chips
+  const bbEnd = l[8].big_blind;
+  assert.ok(bbEnd >= 1000 && bbEnd <= 2000, `end big blind ${bbEnd}`);
+  console.log(l.map(x => `${x.small_blind}/${x.big_blind}`).join(' '));
+});
+
+test('auto structure follows the game: more players or rebuys → bigger blinds at the end; longer night → slower', () => {
+  const base = autoStructure({ stack: 5000, players: 6, hours: 3, minutes: 20 });
+  const more = autoStructure({ stack: 5000, players: 10, hours: 3, minutes: 20 });
+  const reb = autoStructure({ stack: 5000, players: 6, hours: 3, minutes: 20, rebuys: true });
+  const long = autoStructure({ stack: 5000, players: 6, hours: 5, minutes: 20 });
+  assert.ok(more[8].big_blind > base[8].big_blind);
+  assert.ok(reb[8].big_blind > base[8].big_blind);
+  assert.ok(long[8].big_blind < base[8].big_blind);
+  const small = autoStructure({ stack: 1000, players: 4, hours: 2, minutes: 15 });
+  assert.deepEqual([small[0].small_blind, small[0].big_blind], [5, 10]);
+  for (let i = 1; i < small.length; i++) assert.ok(small[i].small_blind > small[i - 1].small_blind);
+  const two = autoStructure({ stack: 200, players: 2, hours: 2, minutes: 30 });
+  for (let i = 1; i < two.length; i++) assert.ok(two[i].small_blind > two[i - 1].small_blind);
+});
+
+test('pace info and live average stack', () => {
+  const l = autoStructure({ stack: 5000, players: 6, hours: 3, minutes: 20 });
+  const p = paceInfo(l, 5000, 180);
+  assert.equal(p.startDepth, 100);
+  assert.equal(p.atEnd.level_no, 9);
+  assert.equal(averageStackBB(8, 5000, 4, 400), 25); // 8 entries (6 + 2 rebuys), 4 left, BB 400
+  assert.equal(averageStackBB(8, 5000, 0, 400), null);
+});

@@ -25,7 +25,7 @@ function Cell({ value, onChange, width = 72, label }: { value: number; onChange:
 }
 
 /** Blind structure: generate from a starting small blind, then edit any level. */
-export function BlindEditor({ levels, onChange }: { levels: Level[]; onChange: (l: Level[]) => void }) {
+export function BlindEditor({ levels, onChange, hideQuick }: { levels: Level[]; onChange: (l: Level[]) => void; hideQuick?: boolean }) {
   const [sb, setSb] = useState(String(levels[0]?.small_blind ?? 25));
   const [min, setMin] = useState(String(levels[0]?.duration_min ?? 15));
   const [count, setCount] = useState(String(levels.length || 12));
@@ -34,7 +34,7 @@ export function BlindEditor({ levels, onChange }: { levels: Level[]; onChange: (
   const bad = (l: Level) => l.small_blind <= 0 || l.big_blind < l.small_blind || l.duration_min <= 0;
   return (
     <View style={{ gap: 10 }}>
-      <Card style={{ gap: 10, borderWidth: 1, borderColor: C.line }}>
+      {!hideQuick && <Card style={{ gap: 10, borderWidth: 1, borderColor: C.line }}>
         <Txt weight="bold">יצירת מבנה מהיר</Txt>
         <Row style={{ justifyContent: 'space-between' }}>
           <View style={{ gap: 4, alignItems: 'center' }}>
@@ -52,7 +52,7 @@ export function BlindEditor({ levels, onChange }: { levels: Level[]; onChange: (
         </Row>
         <Btn small kind="ghost" title="↻ יצירת מבנה (ביג = פי 2)" disabled={!(parseInt(sb, 10) > 0 && parseInt(min, 10) > 0 && parseInt(count, 10) > 0)}
           onPress={() => onChange(makeStructure(parseInt(sb, 10), parseInt(min, 10), parseInt(count, 10)))} />
-      </Card>
+      </Card>}
 
       <Row style={{ paddingHorizontal: 4 }}>
         <Txt muted size={12} style={{ width: 44 }}>רמה</Txt>

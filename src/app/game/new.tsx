@@ -6,7 +6,8 @@ import { useAuth } from '../../lib/auth';
 import { C, ils } from '../../lib/theme';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Back, tap } from '../../ui/kit';
 import { BlindEditor, PayoutEditor, levelsValid, payoutValid } from '../../ui/tournament';
-import { makeStructure, suggestedPayout, type Level } from '../../core/clock';
+import { autoStructure, paceInfo, suggestedPayout, type Level } from '../../core/clock';
+import { blinds } from '../../lib/theme';
 import { nextHost } from '../../core/hosting';
 
 type Player = { id: string; display_name: string; profile_id: string | null; role: string };
@@ -30,7 +31,10 @@ export default function NewGame() {
   const [err, setErr] = useState<string | null>(null);
   const [copiedFrom, setCopiedFrom] = useState<string | null>(null);
   const [type, setType] = useState<'cash' | 'tournament'>('cash');
-  const [levels, setLevels] = useState<Level[]>(() => makeStructure(25, 15, 12));
+  const [levels, setLevels] = useState<Level[]>(() => autoStructure({ stack: 5000, players: 6, hours: 3, minutes: 20 }));
+  const [hours, setHours] = useState(3);
+  const [lvlMin, setLvlMin] = useState(20);
+  const [autoLv, setAutoLv] = useState(true); // off once the banker edits a level by hand
   const [payout, setPayout] = useState<number[] | null>(null); // null = follow the number of players
   const [tStack, setTStack] = useState('5000');
   const [hosting, setHosting] = useState<{ on: boolean; rotation: string[] }>({ on: false, rotation: [] });
@@ -88,8 +92,6 @@ export default function NewGame() {
         const T = lt.data as { id: string; start_stack_chips: number | null; payout_pct: number[] | null };
         if (T.start_stack_chips) setTStack(String(T.start_stack_chips));
         if (T.payout_pct) setPayout(T.payout_pct);
-        const bl = await supabase.from('blind_levels').select('level_no, small_blind, big_blind, duration_min').eq('game_id', T.id).order('level_no');
-        if (bl.data?.length) setLevels(bl.data as Level[]);
       }
     })();
   }, [group, userId]);
@@ -98,6 +100,12 @@ export default function NewGame() {
   const tour = type === 'tournament';
   const stack = tour ? parseInt(tStack, 10) || 0 : parseInt(chipsPerBuyIn, 10) || amount * 10;
   const split = payout ?? suggestedPayout(picked.length);
+  // blinds follow the game: stack, players, rebuys and the planned length
+  useEffect(() => {
+    if (!tour || !autoLv || stack <= 0) return;
+    setLevels(autoStructure({ stack, players: Math.max(2, picked.length), hours, minutes: lvlMin, rebuys: policy === 'all_night' }));
+  }, [tour, autoLv, stack, picked.length, hours, lvlMin, policy]);
+  const pace = paceInfo(levels, stack, hours * 60);
   const quick = useMemo(() => [...new Set([Math.round(amount / 2), amount, amount * 2])].filter(n => n > 0), [amount]);
   const accounts = players.filter(p => p.profile_id);
   const ok = amount > 0 && picked.length >= 2 && name.trim().length > 0
@@ -203,7 +211,18 @@ export default function NewGame() {
           <Txt muted size={12} style={{ marginBottom: 8 }}>אפשר לשנות גם בסוף, לפני הסגירה</Txt>
           <PayoutEditor value={split} onChange={setPayout} players={Math.max(picked.length, 1)} pot={amount * picked.length} />
           <Txt weight="bold" size={16} style={{ marginTop: 18, marginBottom: 8 }}>מבנה בליינדים</Txt>
-          <BlindEditor levels={levels} onChange={setLevels} />
+          <Seg label="כמה זמן הטורניר אמור להימשך" value={hours} onChange={v => { setHours(v); setAutoLv(true); }}
+            options={[2, 3, 4, 5].map(v => ({ v, t: `${v} שעות` }))} />
+          <Seg label="דקות לכל רמה" value={lvlMin} onChange={v => { setLvlMin(v); setAutoLv(true); }}
+            options={[10, 15, 20, 30].map(v => ({ v, t: `${v}` }))} />
+          <Card style={{ gap: 4, marginBottom: 12 }} accent={autoLv}>
+            <Txt weight="bold" size={14}>{autoLv ? '✓ מחושב לפי הערב' : 'מבנה ידני'}</Txt>
+            <Txt size={13}>{`פתיחה ${levels[0] ? blinds(levels[0].small_blind, levels[0].big_blind) : ''} · ${pace.startDepth} ביג לכל שחקן`}</Txt>
+            {pace.atEnd && <Txt size={13}>{`אחרי ${hours} שעות: ${blinds(pace.atEnd.small_blind, pace.atEnd.big_blind)} · הסטאקים קצרים והטורניר נסגר`}</Txt>}
+            <Txt muted size={12}>{`לפי ${Math.max(2, picked.length)} שחקנים × ${stack.toLocaleString('he-IL')} צ׳יפים${policy === 'all_night' ? ' + ריבאיים' : ''}. משתנה אוטומטית כשמשנים שחקנים, צ׳יפים או זמן.`}</Txt>
+            {!autoLv && <Btn small kind="ghost" title="↻ חזרה לחישוב לפי הערב" style={{ marginTop: 6 }} onPress={() => setAutoLv(true)} />}
+          </Card>
+          <BlindEditor hideQuick levels={levels} onChange={l => { setAutoLv(false); setLevels(l); }} />
           <View style={{ height: 18 }} />
         </>
       )}

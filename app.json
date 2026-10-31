@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "דילר",
+    "name": "Dealer",
     "slug": "poker-night",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,10 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.dvirshr.pokernight"
+      "bundleIdentifier": "com.dvirshr.pokernight",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -62,6 +65,13 @@
     "experiments": {
       "typedRoutes": false,
       "baseUrl": "/poker-night"
+    },
+    "locales": {
+      "he": "./locales/he.json",
+      "iw": "./locales/he.json"
+    },
+    "extra": {
+      "variant": "direct"
     }
   }
 }

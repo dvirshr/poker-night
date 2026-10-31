@@ -10,6 +10,8 @@ import { mmss, averageStackBB, type Level } from '../../../core/clock';
 import { C, blinds } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Loading } from '../../../ui/kit';
 import { BlindEditor, levelsValid } from '../../../ui/tournament';
+import { IS_PLAY } from '../../../lib/variant';
+import { openExactAlarmSettings } from '../../../lib/alerts';
 import { useKeyboardInset } from '../../../lib/useKeyboardInset';
 
 /** Short beep + vibration at level change while this screen is open (web has no lock-screen alerts). */
@@ -149,6 +151,9 @@ export default function Clock() {
                   ? 'צלצול ורטט בכל עליית בליינדים, גם כשהמסך כבוי, הטלפון נעול או האפליקציה סגורה. אם הבנקאי עוצר או מקפיץ רמה, ההתראות כאן מתעדכנות ברגע שהאפליקציה פתוחה או ברקע.'
                   : 'בדפדפן אין התראה כשהמסך נעול. כל עוד המסך הזה פתוח: צפצוף ורטט בכל עליית בליינדים, והמסך לא נכבה. התראה גם במסך נעול: באפליקציית האנדרואיד.'}
               </Txt>
+              {IS_PLAY && alerts.on && (
+                <Btn small kind="ghost" title="⏰ צלצול בשנייה המדויקת (הגדרה חד-פעמית)" onPress={() => void openExactAlarmSettings()} />
+              )}
             </Card>
           )}
 

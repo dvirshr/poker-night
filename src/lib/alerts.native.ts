@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { router } from 'expo-router';
 import * as N from 'expo-notifications';
+import * as IntentLauncher from 'expo-intent-launcher';
 import type { Level } from '../core/clock';
 
 export const alertsSupported = true;
@@ -69,4 +70,13 @@ export function useAlertTaps() {
     });
     return () => sub.remove();
   }, []);
+}
+
+/** Android 14+: "Alarms & reminders" must be allowed for alerts to ring on the exact second. Opens that setting. */
+export async function openExactAlarmSettings() {
+  try {
+    await IntentLauncher.startActivityAsync('android.settings.REQUEST_SCHEDULE_EXACT_ALARM', { data: 'package:com.dvirshr.pokernight' });
+  } catch {
+    await IntentLauncher.startActivityAsync('android.settings.APPLICATION_DETAILS_SETTINGS', { data: 'package:com.dvirshr.pokernight' });
+  }
 }

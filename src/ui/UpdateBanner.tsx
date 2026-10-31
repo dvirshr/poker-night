@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 import Constants from 'expo-constants';
 import { APK_LINK } from '../lib/guide';
+import { IS_PLAY } from '../lib/variant';
 import { downloadAndInstall } from '../lib/selfUpdate';
 import { C } from '../lib/theme';
 import { Txt, Btn, Card, Row, useOnResume } from './kit';
@@ -21,6 +22,11 @@ const readDismissed = () => { try { return localStorage.getItem(DISMISSED) ?? ''
 
 /** Android only: tells the player a newer APK is out, what it brings, and where to get it. The website updates by itself. */
 export function UpdateBanner() {
+  if (IS_PLAY) return null; // the Play build is updated by the store
+  return <ApkUpdateBanner />;
+}
+
+function ApkUpdateBanner() {
   const mine = Constants.expoConfig?.version ?? '0';
   const [latest, setLatest] = useState<{ version: string; notes: string; important: boolean } | null>(null);
   const [dismissed, setDismissed] = useState(readDismissed);

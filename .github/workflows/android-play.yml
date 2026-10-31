@@ -1,0 +1,104 @@
+# Builds the Google Play version (AAB) on GitHub's machines and attaches it to the run,
+# ready to upload in Play Console (Release → Testing / Production → Create new release).
+#
+# Differences from the direct APK (android-apk.yml), required by Play policy:
+#   * no in-app self-update and no REQUEST_INSTALL_PACKAGES (Play updates the app)
+#   * SCHEDULE_EXACT_ALARM instead of USE_EXACT_ALARM (the app opens the setting for exact alerts)
+#   * versionCode 1000+ so a Play version is always newer than any direct APK
+# Signed with the same keystore as the APK (ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD),
+# used in Play Console as the upload key (or as the app signing key, so APK users can move to Play
+# without reinstalling).
+name: Android Play (AAB)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-play
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: https://esfubeqfacuyrjylhjmc.supabase.co
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable__h1qDYFh1_eRLb_ZrKg4-Q_6ONxptOZ
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check signing secrets
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KS" ] || [ -z "$PW" ]; then
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD repository secrets"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests (money logic)
+        run: npm test
+
+      - name: Play configuration (version, permissions, variant)
+        run: |
+          node -e "
+            const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json'));
+            const e=a.expo;
+            e.version='1.0.${{ github.run_number }}';
+            e.android.versionCode=1000+${{ github.run_number }};
+            e.android.permissions=e.android.permissions.filter(p=>!/REQUEST_INSTALL_PACKAGES|USE_EXACT_ALARM/.test(p));
+            e.android.blockedPermissions=['android.permission.REQUEST_INSTALL_PACKAGES','android.permission.USE_EXACT_ALARM'];
+            e.extra={...(e.extra||{}),variant:'play'};
+            fs.writeFileSync('app.json',JSON.stringify(a,null,2));
+            console.log('version',e.version,'versionCode',e.android.versionCode,'permissions',e.android.permissions);"
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release bundle (AAB)
+        working-directory: android
+        run: ./gradlew bundleRelease --no-daemon
+
+      - name: Check the manifest has no blocked permissions
+        run: |
+          M=android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml
+          [ -f "$M" ] || M=$(find android/app/build/intermediates -name AndroidManifest.xml -path '*release*' | head -1)
+          grep -o 'android.permission[A-Z_.]*' "$M" | sort -u
+          if grep -q -E 'REQUEST_INSTALL_PACKAGES|USE_EXACT_ALARM' "$M"; then
+            echo "::error::Blocked permission found in the Play manifest"; exit 1
+          fi
+
+      - name: Sign with the project keystore
+        env:
+          KS: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KS" | base64 -d > release.keystore
+          cp android/app/build/outputs/bundle/release/app-release.aab dealer.aab
+          zip -q -d dealer.aab 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.EC' 'META-INF/*.DSA' 'META-INF/MANIFEST.MF' || true
+          jarsigner -keystore release.keystore -storepass:env PW -keypass:env PW dealer.aab poker
+          jarsigner -verify dealer.aab | tail -1
+          rm release.keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dealer-play-1.0.${{ github.run_number }}
+          path: dealer.aab
+          retention-days: 30

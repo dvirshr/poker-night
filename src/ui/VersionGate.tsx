@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Linking, Platform, View } from 'react-native';
 import { supabase, APP_VERSION } from '../lib/supabase';
 import { APK_LINK } from '../lib/guide';
+import { IS_PLAY, openStore } from '../lib/variant';
 import { downloadAndInstall, canSelfUpdate } from '../lib/selfUpdate';
 import { C } from '../lib/theme';
 import { Screen, Txt, Btn, Card, useOnResume } from './kit';
@@ -37,6 +38,7 @@ export function VersionGate({ children }: { children: ReactNode }) {
 
   const update = async () => {
     setFailed(false);
+    if (IS_PLAY) { void openStore(); return; }
     if (!canSelfUpdate) { void Linking.openURL(APK_LINK); return; }
     try {
       setProgress(0);
@@ -56,7 +58,7 @@ export function VersionGate({ children }: { children: ReactNode }) {
         <Txt size={15} style={{ lineHeight: 22 }}>{cfg!.message}</Txt>
         <Txt muted size={12}>{`הגרסה שלך ${APP_VERSION} · נדרשת ${cfg!.min_version} ומעלה. הנתונים שלך שמורים בשרת ולא ייפגעו.`}</Txt>
         <Btn title={progress != null ? `מוריד… ${Math.round(progress * 100)}%` : 'עדכון עכשיו'} busy={progress != null} onPress={() => void update()} />
-        {failed && <Btn small kind="ghost" title="הורדה דרך הדפדפן" onPress={() => void Linking.openURL(APK_LINK)} />}
+        {failed && !IS_PLAY && <Btn small kind="ghost" title="הורדה דרך הדפדפן" onPress={() => void Linking.openURL(APK_LINK)} />}
         <Txt muted size={12} color={C.muted}>אפשר גם להמשיך מהאתר, בלי התקנה.</Txt>
         <Btn small kind="ghost" title="פתיחת האתר" onPress={() => void Linking.openURL('https://dvirshr.github.io/poker-night')} />
       </Card>

@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "דילר"
+  },
+  "android": {
+    "app_name": "דילר"
+  }
+}

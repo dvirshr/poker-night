@@ -31,6 +31,15 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
 
   useEffect(() => { if (ready && intro.current) leave(); }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  type AV = Animated.AnimatedInterpolation<number | string>;
+  const logoY: AV = logo.interpolate({ inputRange: [0, 1], outputRange: [0, -26] });
+  const logoS: AV = logo.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] });
+  const logoR: AV = logo.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '-6deg', '0deg'] });
+  const wordY: AV = word.interpolate({ inputRange: [0, 1], outputRange: [18, -10] });
+  const tagY: AV = word.interpolate({ inputRange: [0, 1], outputRange: [12, -8] });
+  const logoStyle = { transform: [{ translateY: logoY }, { scale: logoS }, { rotate: logoR }] } as object;
+  const wordStyle = { fontFamily: 'SecularOne_400Regular', fontSize: 48, color: C.text, marginTop: 4, opacity: word, transform: [{ translateY: wordY }] } as object;
+  const tagStyle = { fontFamily: 'Rubik_400Regular', fontSize: 14, color: C.muted, opacity: word, transform: [{ translateY: tagY }] } as object;
   const left = useRef(false);
   function leave() {
     if (left.current) return;
@@ -40,25 +49,13 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
 
   return (
     <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', opacity: out }]}>
-      <Animated.View style={{
-        transform: [
-          { translateY: logo.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) },
-          { scale: logo.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) },
-          { rotate: logo.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '-6deg', '0deg'] }) },
-        ],
-      }}>
+      <Animated.View style={logoStyle}>
         <Logo size={112} />
       </Animated.View>
-      <Animated.Text style={{
-        fontFamily: 'SecularOne_400Regular', fontSize: 48, color: C.text, marginTop: 4,
-        opacity: word, transform: [{ translateY: word.interpolate({ inputRange: [0, 1], outputRange: [18, -10] }) }],
-      }}>
+      <Animated.Text style={wordStyle}>
         דילר
       </Animated.Text>
-      <Animated.Text style={{
-        fontFamily: 'Rubik_400Regular', fontSize: 14, color: C.muted, opacity: word,
-        transform: [{ translateY: word.interpolate({ inputRange: [0, 1], outputRange: [12, -8] }) }],
-      }}>
+      <Animated.Text style={tagStyle}>
         ערב פוקר לחבר'ה
       </Animated.Text>
     </Animated.View>

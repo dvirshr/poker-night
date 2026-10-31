@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { C, F } from '../lib/theme';
+import { SvgXml } from 'react-native-svg';
+import { ICONS } from './brandXml';
 import type { Live } from '../lib/useGame';
 
 export const tap = () => {
@@ -47,7 +49,7 @@ export const Num = (p: TxtProps) => <Txt {...p} style={[{ fontVariant: ['tabular
 export function H1({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
   return (
     <View style={{ gap: 6, marginBottom: 16 }}>
-      <Txt size={26} weight="black">{children}</Txt>
+      <Txt size={30} weight="display" style={{ lineHeight: 36 }}>{children}</Txt>
       {sub ? <Txt muted size={13}>{sub}</Txt> : null}
     </View>
   );
@@ -76,7 +78,7 @@ export function Btn({ title, onPress, kind = 'primary', disabled, busy, style, s
       {busy ? (
         <ActivityIndicator color={primary ? C.accInk : C.text} />
       ) : (
-        <Txt center weight={primary ? 'black' : 'bold'} size={small ? 15 : 17} color={primary ? C.accInk : kind === 'danger' ? C.danger : C.text}>
+        <Txt center weight={small ? (primary ? 'black' : 'bold') : 'display'} size={small ? 15 : 19} color={primary ? C.accInk : kind === 'danger' ? C.danger : C.text}>
           {title}
         </Txt>
       )}
@@ -154,9 +156,9 @@ export function RefreshBtn({ onPress }: { onPress: () => void | Promise<unknown>
         setBusy(true);
         try { await onPress(); } finally { setTimeout(() => setBusy(false), 400); }
       }}
-      style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
+      style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: C.line, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 })}
     >
-      {busy ? <ActivityIndicator size="small" color={C.acc} /> : <Txt size={20} weight="bold" color={C.acc} center>⟳</Txt>}
+      {busy ? <ActivityIndicator size="small" color={C.acc} /> : <SvgXml width={22} height={22} xml={`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${C.acc}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS.refresh}</svg>`} />}
     </Pressable>
   );
 }

@@ -4,9 +4,11 @@ import { router, useFocusEffect } from 'expo-router';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { UpdateBanner } from '../ui/UpdateBanner';
+import { Brand, IconBtn, Icon } from '../ui/brand';
+import { Pressable } from 'react-native';
 import { supabase, heError } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { C } from '../lib/theme';
+import { C, ils } from '../lib/theme';
 import { pendingInvite, clearPendingInvite } from '../lib/invite';
 import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge , RefreshBtn, useOnResume } from '../ui/kit';
 
@@ -27,6 +29,10 @@ export default function Home() {
   const [notice, setNotice] = useState<string | null>(null);
   const [showOld, setShowOld] = useState(false);
   const [retry, setRetry] = useState<{ code: string; name: string } | null>(null);
+  const [operator, setOperator] = useState(false);
+  // per group: players, last night, league leader; per open night: players and pot
+  const [info, setInfo] = useState<Record<string, { players: number; last: string | null; leader: string | null }>>({});
+  const [live, setLive] = useState<Record<string, { players: number; pot: number }>>({});
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -36,8 +42,10 @@ export default function Home() {
       supabase.from('profiles').select('display_name').eq('id', userId).single(),
     ]);
     if (m.error) setErr(heError(m.error));
-    setGroups((m.data ?? []) as unknown as Membership[]);
+    const mine = (m.data ?? []) as unknown as Membership[];
+    setGroups(mine);
     setGames((g.data ?? []) as OpenGame[]);
+    void loadExtras(mine.filter(x => x.status === 'active').map(x => x.group_id), ((g.data ?? []) as OpenGame[]).map(x => x.id));
     const myName = p.data?.display_name ?? '';
     setMe(myName);
     const code = pendingInvite();
@@ -54,7 +62,25 @@ export default function Home() {
       }
     }
   }, [userId]);
-  useFocusEffect(useCallback(() => void load(), [load]));
+  const loadExtras = async (groupIds: string[], gameIds: string[]) => {
+    if (!groupIds.length) return;
+    const [pl, last, lg, tot] = await Promise.all([
+      supabase.from('players').select('group_id').in('group_id', groupIds).eq('status', 'active'),
+      supabase.from('games').select('group_id, played_on').in('group_id', groupIds).eq('status', 'closed').order('played_on', { ascending: false }),
+      supabase.from('league_table').select('group_id, display_name, net_total').in('group_id', groupIds).order('net_total', { ascending: false }),
+      gameIds.length ? supabase.from('game_totals').select('game_id, players, pot').in('game_id', gameIds) : Promise.resolve({ data: [] as { game_id: string; players: number; pot: number }[] }),
+    ]);
+    const out: Record<string, { players: number; last: string | null; leader: string | null }> = {};
+    for (const id of groupIds) out[id] = { players: 0, last: null, leader: null };
+    for (const r of (pl.data ?? []) as { group_id: string }[]) out[r.group_id].players++;
+    for (const r of (last.data ?? []) as { group_id: string; played_on: string }[]) if (!out[r.group_id].last) out[r.group_id].last = r.played_on;
+    for (const r of (lg.data ?? []) as { group_id: string; display_name: string; net_total: number }[]) if (!out[r.group_id].leader && r.net_total > 0) out[r.group_id].leader = r.display_name;
+    setInfo(out);
+    const lv: Record<string, { players: number; pot: number }> = {};
+    for (const r of (tot.data ?? []) as { game_id: string; players: number; pot: number }[]) lv[r.game_id] = { players: r.players, pot: r.pot };
+    setLive(lv);
+  };
+  useFocusEffect(useCallback(() => { void load(); supabase.rpc('is_app_admin').then(({ data }) => setOperator(data === true)); }, [load]));
   useOnResume(useCallback(() => void load(), [load]));
 
   const retryJoin = async () => {
@@ -102,12 +128,13 @@ export default function Home() {
 
   return (
     <Screen>
-      <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <H1 sub={me ? `שלום ${me}` : undefined}>דילר</H1>
-        <Row>
-          <RefreshBtn onPress={load} />
-          <Btn title="❓" kind="ghost" small style={{ paddingHorizontal: 12 }} onPress={() => router.push('/help')} />
-          <Btn title="👤" kind="ghost" small style={{ paddingHorizontal: 12 }} onPress={() => router.push('/account')} />
+      <Row style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Brand sub={me ? `שלום ${me}` : undefined} />
+        <Row style={{ gap: 8 }}>
+          {operator && <IconBtn name="shield" label="ניהול מערכת" onPress={() => router.push('/admin')} />}
+          <IconBtn name="refresh" label="רענון" onPress={load} />
+          <IconBtn name="help" label="איך זה עובד" onPress={() => router.push('/help')} />
+          <IconBtn name="user" label="החשבון שלי" onPress={() => router.push('/account')} />
         </Row>
       </Row>
       <ErrorBar text={err} onClose={() => setErr(null)} />
@@ -127,21 +154,21 @@ export default function Home() {
       )}
 
       {games.length > 0 && (
-        <View style={{ gap: 10, marginBottom: 20 }}>
-          <Txt weight="bold" size={16}>ערבים פתוחים</Txt>
+        <View style={{ gap: 10, marginBottom: 22 }}>
           {games.map(g => (
-            <Card key={g.id} accent onPress={() => router.push(`/game/${g.id}`)}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Txt weight="bold" size={17}>{g.name}</Txt>
-                <Badge solid text={g.status === 'open' ? 'משחקים' : 'בספירה'} />
+            <Card key={g.id} onPress={() => router.push(`/game/${g.id}`)} style={{ borderWidth: 1.5, borderColor: C.acc, backgroundColor: '#211B10', gap: 4 }}>
+              <Row style={{ gap: 8 }}>
+                <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: C.pos }} />
+                <Txt size={12} weight="bold" color={C.pos}>{g.status === 'open' ? 'משחקים עכשיו' : 'בספירה'}</Txt>
               </Row>
-              <Txt muted size={13}>{groupName(g.group_id)}</Txt>
+              <Txt weight="display" size={23}>{`${g.name} · ${groupName(g.group_id)}`}</Txt>
+              {live[g.id] && <Txt muted size={13}>{`${live[g.id].players} שחקנים · קופה ${ils(live[g.id].pot)}`}</Txt>}
             </Card>
           ))}
         </View>
       )}
 
-      <Txt weight="bold" size={16} style={{ marginBottom: 10 }}>הקבוצות שלי</Txt>
+      <Txt weight="display" size={20} muted style={{ marginBottom: 10 }}>הקבוצות שלי</Txt>
       <View style={{ gap: 10, marginBottom: 20 }}>
         {liveGroups.length === 0 && <Txt muted>עוד אין קבוצות. פתח קבוצה חדשה או הצטרף עם קוד הזמנה.</Txt>}
         {liveGroups.map(g =>
@@ -151,10 +178,25 @@ export default function Home() {
               <Txt muted size={13}>תקבל גישה ברגע שמנהל הקבוצה יאשר</Txt>
             </Card>
           ) : (
-            <Card key={g.id} onPress={() => router.push(`/group/${g.group_id}`)}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Txt weight="bold" size={17}>{g.groups?.name}</Txt>
+            <Card key={g.id} onPress={() => router.push(`/group/${g.group_id}`)} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 }}>
+              <View style={{ flex: 1, gap: 3 }}>
+                <Txt weight="display" size={20}>{g.groups?.name}</Txt>
+                {info[g.group_id] && (
+                  <Txt muted size={13}>{[
+                    `${info[g.group_id].players} שחקנים`,
+                    info[g.group_id].last ? `ערב אחרון ${shortDate(info[g.group_id].last!)}` : 'עוד לא שיחקו',
+                    info[g.group_id].leader ? `מוביל: ${info[g.group_id].leader}` : null,
+                  ].filter(Boolean).join(' · ')}</Txt>
+                )}
+              </View>
+              <Row style={{ gap: 10 }}>
                 {g.role === 'admin' && <Badge text="מנהל" />}
+                {g.role === 'admin' && (
+                  <Pressable hitSlop={10} accessibilityLabel="הגדרות הקבוצה" onPress={() => router.push({ pathname: '/group/[id]', params: { id: g.group_id, tab: 'settings' } })}>
+                    <Icon name="gear" size={21} />
+                  </Pressable>
+                )}
+                <Icon name="chev" size={18} color={C.muted} />
               </Row>
             </Card>
           ),
@@ -216,4 +258,12 @@ function appVersion() {
   if (Platform.OS !== 'web') return `אנדרואיד · גרסה ${Constants.expoConfig?.version ?? '?'}`;
   const b = process.env.EXPO_PUBLIC_BUILD_TIME;
   return b ? `אתר · עודכן ${new Date(b).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' })}` : 'אתר';
+}
+
+/** "24.10" (or "היום") */
+function shortDate(d: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (d === today) return 'היום';
+  const [, m, day] = d.split('-');
+  return `${parseInt(day, 10)}.${parseInt(m, 10)}`;
 }

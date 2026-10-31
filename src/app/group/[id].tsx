@@ -17,7 +17,7 @@ type Game = { id: string; name: string; status: string; played_on: string; creat
 type League = { player_id: string; display_name: string; games_played: number; net_total: number; net_avg: number; wins: number; game_type?: string; podiums?: number };
 
 export default function Group() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const { userId } = useAuth();
   const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey; hosting_enabled?: boolean; host_rotation?: string[]; archived_at?: string | null; deleted_at?: string | null } | null>(null);
   const [gname, setGname] = useState('');
@@ -29,7 +29,7 @@ export default function Group() {
   const [sort, setSort] = useState<LeagueSort>('total');
   const [mineOnly, setMineOnly] = useState(false);
   const [period, setPeriod] = useState<'month' | 'year'>('month');
-  const [tab, setTab] = useState<'league' | 'month' | 'history' | 'hosting' | 'members' | 'settings'>('league');
+  const [tab, setTab] = useState<'league' | 'month' | 'history' | 'hosting' | 'members' | 'settings'>(tabParam === 'settings' ? 'settings' : 'league');
   const [editing, setEditing] = useState<string | null>(null);
   const [rename, setRename] = useState('');
   const [invite, setInvite] = useState<string | null>(null);

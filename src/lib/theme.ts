@@ -23,6 +23,7 @@ export const F = {
   medium: 'Rubik_500Medium',
   bold: 'Rubik_700Bold',
   black: 'Rubik_800ExtraBold',
+  display: 'SecularOne_400Regular', // headings, titles, buttons
 };
 
 export const medal = (place: number) => (place === 1 ? C.gold : place === 2 ? C.silver : place === 3 ? C.bronze : C.raised);

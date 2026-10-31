@@ -4,6 +4,7 @@ import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold } from '@expo-google-fonts/rubik';
+import { SecularOne_400Regular } from '@expo-google-fonts/secular-one';
 import { AuthProvider, useAuth } from '../lib/auth';
 import { C } from '../lib/theme';
 import { flush } from '../lib/queue';
@@ -38,7 +39,7 @@ function Gate() {
 }
 
 export default function Root() {
-  const [fonts, fontError] = useFonts({ Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold });
+  const [fonts, fontError] = useFonts({ Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold, SecularOne_400Regular });
   // never block the app on fonts: after 4 s (or on a load error) carry on with the system font
   const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {

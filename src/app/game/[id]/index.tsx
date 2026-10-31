@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
 import { supabase, heError } from '../../../lib/supabase';
 import { enqueue } from '../../../lib/queue';
+import { useKeyboardInset } from '../../../lib/useKeyboardInset';
 import { useGame, type Row as Entry } from '../../../lib/useGame';
 import { chipsToIls } from '../../../core/settle';
 import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
@@ -313,10 +314,11 @@ export default function Table() {
 }
 
 function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: React.ReactNode }) {
+  const kb = useKeyboardInset(); // lift the sheet above the keyboard, so what is typed stays visible
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: '#000a' }} onPress={onClose} />
-      <View style={{ backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 28, gap: 12, maxHeight: '80%', width: '100%', maxWidth: 520, alignSelf: 'center', borderWidth: 1, borderColor: C.line }}>
+      <View style={{ backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 28, gap: 12, maxHeight: '80%', width: '100%', maxWidth: 520, alignSelf: 'center', borderWidth: 1, borderColor: C.line, marginBottom: kb }}>
         {children}
       </View>
     </Modal>
@@ -343,7 +345,7 @@ function PlayerSheet(p: {
         <Txt size={22} weight="black">{p.name}</Txt>
         <Num weight="bold" color={C.acc}>{`נכנס ${ils(p.totalIn)}`}</Num>
       </Row>
-      {p.canRebuy ? (
+      {!leaving && p.canRebuy ? (
         p.left > 0 ? (
           <>
             <Txt muted size={13}>{`כניסה חוזרת · נשארו ${p.left}`}</Txt>
@@ -361,30 +363,36 @@ function PlayerSheet(p: {
           <Txt color={C.neg}>הגיע למקסימום הריבאיים</Txt>
         )
       ) : null}
-      {p.tour && (
+      {p.tour && !leaving && (
         p.isOut ? (
           <Btn small kind="ghost" title="↩ החזרה לטורניר (הודח בטעות)" onPress={() => p.onOut(false)} />
         ) : (
           <Btn small kind="danger" title="❌ הודח מהטורניר" onPress={() => p.onOut(true)} />
         )
       )}
-      {p.tour && !p.isOut && <Txt muted size={12}>שחקן שעושה ריבאי לא מסמנים כמודח. מקומות נקבעים לפי סדר ההדחה.</Txt>}
+      {p.tour && !p.isOut && !leaving && <Txt muted size={12}>שחקן שעושה ריבאי לא מסמנים כמודח. מקומות נקבעים לפי סדר ההדחה.</Txt>}
       {p.canLeave && (
         leaving ? (
           <Card style={{ gap: 8, borderWidth: 1, borderColor: C.line }}>
             <Txt weight="bold">{p.counting ? 'ספירת צ׳יפים' : 'יציאה מהשולחן'}</Txt>
-            <Field label="כמה צ׳יפים יש לו עכשיו" value={chips} onChangeText={t => setChips(t.replace(/\D/g, '').slice(0, 7))} keyboardType="number-pad" autoFocus />
-            <Num weight="black" size={20} color={C.acc}>{`= ${ils(value)}`}</Num>
-            <Txt muted size={12}>נרשם עכשיו כספירה שלו. בסוף הערב הוא כבר יופיע כנספר. אפשר לבטל מההיסטוריה אם הוא חוזר.</Txt>
+            <Row style={{ alignItems: 'flex-end' }}>
+              <View style={{ flex: 1 }}>
+                <Field label="כמה צ׳יפים יש לו עכשיו" value={chips} onChangeText={t => setChips(t.replace(/\D/g, '').slice(0, 7))} keyboardType="number-pad" autoFocus
+                  returnKeyType="done" onSubmitEditing={() => { if (chips !== '') p.onLeave(n); }} />
+              </View>
+              <Num weight="black" size={20} color={C.acc} style={{ marginBottom: 22 }}>{`= ${ils(value)}`}</Num>
+            </Row>
             <Row>
               <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => { setLeaving(false); setChips(''); }} />
               <Btn small title={p.counting ? 'שמירת ספירה' : 'רישום יציאה'} style={{ flex: 2 }} disabled={chips === ''} onPress={() => p.onLeave(n)} />
             </Row>
+            <Txt muted size={12}>נרשם עכשיו כספירה שלו. בסוף הערב הוא כבר יופיע כנספר. אפשר לבטל מההיסטוריה אם הוא חוזר.</Txt>
           </Card>
         ) : (
           <Btn small kind={p.counting ? 'primary' : 'ghost'} title={p.counting ? 'הזנת ספירה' : 'יציאה מהשולחן (ספירה עכשיו)'} onPress={() => setLeaving(true)} />
         )
       )}
+      {!leaving && <>
       <Txt weight="bold" size={14}>היסטוריה</Txt>
       <ScrollView style={{ maxHeight: 220 }}>
         {live.length === 0 && <Txt muted size={13}>אין רישומים</Txt>}
@@ -396,6 +404,7 @@ function PlayerSheet(p: {
         ))}
       </ScrollView>
       <Txt muted size={11}>ביטול לא מוחק: נרשמת שורת ביטול, וההיסטוריה נשמרת.</Txt>
+      </>}
     </Sheet>
   );
 }

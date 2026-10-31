@@ -10,6 +10,7 @@ import { mmss, type Level } from '../../../core/clock';
 import { C, blinds } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, ErrorBar, LivePill, Row, Back, Loading } from '../../../ui/kit';
 import { BlindEditor, levelsValid } from '../../../ui/tournament';
+import { useKeyboardInset } from '../../../lib/useKeyboardInset';
 
 /** Short beep + vibration at level change while this screen is open (web has no lock-screen alerts). */
 function cue() {
@@ -165,10 +166,11 @@ export default function Clock() {
 function EditLevels({ open, onClose, levels, onSave }: { open: boolean; onClose: () => void; levels: Level[]; onSave: (l: Level[]) => void }) {
   const [draft, setDraft] = useState<Level[]>(levels);
   useEffect(() => { if (open) setDraft(levels); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kb = useKeyboardInset();
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: '#000a' }} onPress={onClose} />
-      <View style={{ backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 28, gap: 12, maxHeight: '88%', width: '100%', maxWidth: 520, alignSelf: 'center', borderWidth: 1, borderColor: C.line }}>
+      <View style={{ backgroundColor: C.bg, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, paddingBottom: 28, gap: 12, maxHeight: kb ? '96%' : '88%', width: '100%', maxWidth: 520, alignSelf: 'center', borderWidth: 1, borderColor: C.line, marginBottom: kb }}>
         <Txt size={22} weight="black">עריכת הבליינדים</Txt>
         <Txt muted size={12}>השעון ממשיך לרוץ. שינוי ברמה הנוכחית חל מיד.</Txt>
         <ScrollView keyboardShouldPersistTaps="handled">

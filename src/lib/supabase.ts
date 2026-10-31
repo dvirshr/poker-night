@@ -1,12 +1,18 @@
 import 'expo-sqlite/localStorage/install';
 import { createClient } from '@supabase/supabase-js';
 import { AppState, Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+/** This build's version: the APK is 0.1.<build number>; the website is always the latest build. */
+export const APP_VERSION = Constants.expoConfig?.version ?? '0';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!url || !key) throw new Error('Missing EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local');
 
 export const supabase = createClient(url, key, {
+  // the server may refuse versions the operator no longer supports (see app_config / check_request)
+  global: { headers: Platform.OS === 'web' ? { 'x-app-platform': 'web' } : { 'x-app-version': APP_VERSION, 'x-app-platform': Platform.OS } },
   auth: {
     storage: localStorage,
     autoRefreshToken: true,
@@ -26,6 +32,8 @@ if (Platform.OS !== 'web') {
 export function heError(e: unknown): string {
   const m = (e as { message?: string })?.message ?? String(e);
   const map: [RegExp, string][] = [
+    [/APP_VERSION|no longer supported/i, 'הגרסה הזו כבר לא נתמכת. צריך לעדכן את האפליקציה'],
+    [/operators only/i, 'המסך הזה רק למפעילי האפליקציה'],
     [/Invalid login credentials/i, 'מייל או סיסמה שגויים'],
     [/User already registered/i, 'המייל כבר רשום. אפשר להתחבר'],
     [/Password should be at least/i, 'סיסמה של 6 תווים לפחות'],

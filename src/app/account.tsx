@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { supabase, heError } from '../lib/supabase';
+import { supabase, heError, APP_VERSION } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { pending } from '../lib/queue';
 import { clearPendingInvite, APP_URL } from '../lib/invite';
@@ -23,6 +23,10 @@ export default function Account() {
   }, [userId]);
 
   const unsynced = pending().length;
+  const [operator, setOperator] = useState(false);
+  useEffect(() => {
+    supabase.rpc('is_app_admin').then(({ data }) => setOperator(data === true));
+  }, []);
 
   const changePassword = async () => {
     const email = session?.user.email;
@@ -58,7 +62,9 @@ export default function Account() {
         <Btn kind="ghost" title="יציאה מהחשבון" onPress={() => void supabase.auth.signOut()} />
         <Btn kind="ghost" title={mailSent ? 'נשלח קישור למייל ✓' : 'שינוי סיסמה (קישור למייל)'} disabled={mailSent} onPress={() => void changePassword()} />
         <Btn kind="ghost" title="פרטיות ותנאי שימוש" onPress={() => router.push('/privacy')} />
+        {operator && <Btn kind="ghost" title="🛠 ניהול מערכת" onPress={() => router.push('/admin')} />}
       </View>
+      <Txt muted size={11} center style={{ marginTop: 10 }}>{`גרסה ${APP_VERSION}`}</Txt>
 
       <Card style={{ gap: 8, marginTop: 28, borderColor: C.danger }}>
         <Txt weight="bold" size={16} color={C.danger}>מחיקת חשבון</Txt>

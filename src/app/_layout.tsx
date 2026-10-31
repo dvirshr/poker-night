@@ -11,6 +11,7 @@ import { Loading, Screen, Txt, Btn } from '../ui/kit';
 import type { ErrorBoundaryProps } from 'expo-router';
 import { captureInviteFromUrl } from '../lib/invite';
 import { useAlertTaps } from '../lib/alerts';
+import { VersionGate } from '../ui/VersionGate';
 
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.documentElement.dir = 'rtl';
@@ -48,7 +49,7 @@ export default function Root() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <AuthProvider>{ready ? <Gate /> : <Loading />}</AuthProvider>
+      <AuthProvider>{ready ? <VersionGate><Gate /></VersionGate> : <Loading />}</AuthProvider>
     </SafeAreaProvider>
   );
 }

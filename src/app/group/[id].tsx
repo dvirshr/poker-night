@@ -215,16 +215,16 @@ export default function Group() {
                 <View key={r.playerId} style={{ gap: 6 }}>
                   {firstOut && <Txt muted size={12} style={{ marginTop: 8 }}>{`פחות מ־${MIN_NIGHTS} ערבים · לא מדורגים עדיין`}</Txt>}
                   <Card onPress={() => router.push(`/player/${id}/${r.playerId}`)} accent={r.playerId === me?.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, opacity: r.qualified ? 1 : 0.55 }}>
-                    <Row>
+                    <Row style={{ flex: 1, minWidth: 0 }}>
                       <Num weight="black" size={16} color={C.muted}>{r.qualified ? String(rank) : '–'}</Num>
-                      <View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Txt weight="bold">{`${r.name} ${titleBadges(stats.titles.get(r.playerId))}`}</Txt>
                         <Txt muted size={12}>{kind === 'tournament'
                           ? `${r.nights === 1 ? 'טורניר אחד' : `${r.nights} טורנירים`} · ${r.wins} 🏆 · ${r.podiums} פודיומים · סה״כ ${ils(r.net, true)}`
                           : `${r.nights === 1 ? 'ערב אחד' : `${r.nights} ערבים`} · ${r.wins === 1 ? 'נצחון אחד' : `${r.wins} נצחונות`} · ${sort === 'total' ? `ממוצע ${ils(Math.round(r.avg), true)}` : `סה״כ ${ils(r.net, true)}`}`}</Txt>
                       </View>
                     </Row>
-                    <Num weight="black" size={18} color={tone(r)}>{metric(r)}</Num>
+                    <Num weight="black" size={18} color={tone(r)} style={{ flexShrink: 0, marginStart: 8 }}>{metric(r)}</Num>
                   </Card>
                 </View>
               );

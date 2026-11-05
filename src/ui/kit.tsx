@@ -34,6 +34,8 @@ type TxtProps = { children: ReactNode; style?: TextStyle | TextStyle[]; muted?: 
 export function Txt({ children, style, muted, size = 15, weight = 'regular', color, center }: TxtProps) {
   return (
     <Text
+      // phones with a large system font (Samsung "font size") scale text; cap it so rows still fit
+      maxFontSizeMultiplier={1.2}
       style={[
         { fontFamily: F[weight], fontSize: size, color: color ?? (muted ? C.muted : C.text), textAlign: center ? 'center' : 'right', writingDirection: 'rtl' },
         style as TextStyle,

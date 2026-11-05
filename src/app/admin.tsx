@@ -12,6 +12,7 @@ type L = { at: string; operator: string; action: string; group_name: string | nu
 
 const STATUS: Record<string, string> = { open: 'משחקים', counting: 'בספירה', closed: 'נסגר', cancelled: 'בוטל' };
 const ACTION: Record<string, string> = {
+  user_rename: 'שינה שם משתמש',
   group_archive: 'העביר לארכיון', group_unarchive: 'החזיר מהארכיון', group_delete: 'מחק קבוצה', group_restore: 'שחזר קבוצה', game_cancel: 'ביטל ערב',
 };
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -165,18 +166,31 @@ function Users({ onError }: { onError: (m: string) => void }) {
   const [rows, setRows] = useState<U[] | null>(null);
   const [q, setQ] = useState('');
   const [onlyAdmins, setOnlyAdmins] = useState(false);
-  useEffect(() => {
+  const [edit, setEdit] = useState<{ id: string; name: string } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const load = useCallback(() => {
     supabase.rpc('op_users').then(({ data, error }) => {
       if (error) { onError(heError(error)); setRows([]); return; }
       setRows((data ?? []) as U[]);
     });
   }, [onError]);
+  useEffect(() => { load(); }, [load]);
+  const rename = async () => {
+    if (!edit) return;
+    const { data, error } = await supabase.rpc('op_rename_user', { p_profile: edit.id, p_name: edit.name, p_all_groups: true });
+    if (error) return onError(heError(error));
+    const skipped = ((data ?? []) as { group_name: string; renamed: boolean }[]).filter(r => !r.renamed).map(r => r.group_name);
+    setNote(skipped.length ? `עודכן. נשאר השם הישן ב: ${skipped.join(', ')} (השם תפוס שם)` : 'השם עודכן בחשבון ובכל הקבוצות');
+    setEdit(null);
+    load();
+  };
   const list = (rows ?? []).filter(u => !u.deleted_at && (!onlyAdmins || u.admin_of) && (!q.trim() || u.display_name.includes(q.trim()) || (u.admin_of ?? '').includes(q.trim())));
   const deleted = (rows ?? []).filter(u => u.deleted_at).length;
   return (
     <>
       <Seg value={onlyAdmins ? 1 : 0} onChange={v => setOnlyAdmins(v === 1)} options={[{ v: 0, t: `כולם (${(rows ?? []).length - deleted})` }, { v: 1, t: 'מנהלי קבוצות' }]} />
       <Field label="חיפוש לפי שם או קבוצה" value={q} onChangeText={setQ} />
+      {note && <Txt size={13} color={C.pos} style={{ marginBottom: 8 }}>{note}</Txt>}
       {rows == null ? <Loading /> : list.length === 0 ? <Txt muted>אין משתמשים</Txt> : (
         <View style={{ gap: 8 }}>
           {list.map(u => (
@@ -190,6 +204,17 @@ function Users({ onError }: { onError: (m: string) => void }) {
               </Row>
               <Txt size={13}>{`${u.groups} קבוצות${u.admin_of ? ` · מנהל: ${u.admin_of}` : ''}`}</Txt>
               <Txt muted size={12}>{`נרשם ${day(u.created_at)} · שיחק לאחרונה ${day(u.last_game)}`}</Txt>
+              {edit?.id === u.profile_id ? (
+                <View style={{ gap: 6, marginTop: 6 }}>
+                  <Field label="שם חדש (בחשבון ובכל הקבוצות)" value={edit.name} onChangeText={t => setEdit({ id: u.profile_id, name: t })} maxLength={40} />
+                  <Row>
+                    <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => setEdit(null)} />
+                    <Btn small title="שמירה" style={{ flex: 2 }} disabled={!edit.name.trim() || edit.name.trim() === u.display_name} onPress={() => void rename()} />
+                  </Row>
+                </View>
+              ) : (
+                <Btn small kind="ghost" title="✎ שינוי שם" style={{ marginTop: 6, height: 36 }} onPress={() => { setEdit({ id: u.profile_id, name: u.display_name }); setNote(null); }} />
+              )}
             </Card>
           ))}
           {deleted > 0 && <Txt muted size={12}>{`${deleted} חשבונות נמחקו (ההיסטוריה שלהם נשארה כאורחים בקבוצות)`}</Txt>}

@@ -402,6 +402,9 @@ export default function Group() {
               </Card>
               {isAdmin && editing === p.id && (
                 <Card style={{ gap: 6, borderWidth: 1, borderColor: C.line }}>
+                  {p.profile_id && p.profile_id !== userId ? (
+                    <Txt muted size={13}>את השם של שחקן רשום משנה רק הוא עצמו, במסך 👤 או בלשונית הזו.</Txt>
+                  ) : (<>
                   <Field label="שינוי שם" value={rename} onChangeText={setRename} maxLength={40} />
                   <Btn
                     small
@@ -414,6 +417,7 @@ export default function Group() {
                     })}
                   />
                   <Txt muted size={11}>ההיסטוריה נשמרת. השם מתעדכן בכל הערבים והליגה.</Txt>
+                  </>)}
                   {p.profile_id && p.profile_id !== userId && (
                     <>
                       <View style={{ height: 6 }} />

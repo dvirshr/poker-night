@@ -49,6 +49,8 @@ export function heError(e: unknown): string {
     [/only the banker or a group admin can cancel/i, 'רק הבנקאי או מנהל הקבוצה יכולים לבטל ערב'],
     [/group is archived/i, 'הקבוצה בארכיון או נמחקה. מנהל יכול להחזיר אותה בהגדרות'],
     [/group has an open game/i, 'יש בקבוצה ערב פתוח. קודם לסגור או לבטל אותו'],
+    [/only the player can change his own name/i, 'את השם של שחקן רשום משנה רק הוא עצמו'],
+    [/name must be 1-40/i, 'שם של 1 עד 40 תווים'],
     [/game is closed/i, 'הערב סגור ולא ניתן לשינוי'],
     [/pot is not balanced/i, 'הקופה לא מאוזנת'],
     [/every player must be counted/i, 'צריך לספור את כל השחקנים'],

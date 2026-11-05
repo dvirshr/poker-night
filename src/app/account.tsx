@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth';
 import { pending } from '../lib/queue';
 import { clearPendingInvite, APP_URL } from '../lib/invite';
 import { C } from '../lib/theme';
-import { Screen, Txt, Card, Back, Btn, ErrorBar, ConfirmBtn } from '../ui/kit';
+import { Screen, Txt, Card, Back, Btn, ErrorBar, ConfirmBtn, Field, Seg } from '../ui/kit';
 
 /** The signed-in person's own account: who am I, sign out, privacy, delete account. */
 export default function Account() {
@@ -15,6 +15,9 @@ export default function Account() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [mailSent, setMailSent] = useState(false);
+  const [editName, setEditName] = useState<string | null>(null);
+  const [allGroups, setAllGroups] = useState<'all' | 'account'>('all');
+  const [renameNote, setRenameNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -37,6 +40,24 @@ export default function Account() {
     else setMailSent(true);
   };
 
+  const saveName = async () => {
+    if (editName == null) return;
+    setErr(null);
+    setBusy(true);
+    const { data, error } = await supabase.rpc('rename_everywhere', { p_name: editName, p_all_groups: allGroups === 'all' });
+    setBusy(false);
+    if (error) return setErr(heError(error));
+    const rows = (data ?? []) as { group_name: string; renamed: boolean }[];
+    const skipped = rows.filter(r => !r.renamed).map(r => r.group_name);
+    setName(editName.trim());
+    setEditName(null);
+    setRenameNote(allGroups === 'account'
+      ? 'השם בחשבון עודכן. בקבוצות הקיימות השם לא השתנה.'
+      : skipped.length
+        ? `עודכן בחשבון ובקבוצות. ב${skipped.length === 1 ? 'קבוצה' : 'קבוצות'} ${skipped.map(n => `"${n}"`).join(', ')} השם כבר תפוס על ידי חבר אחר, אז שם נשאר הישן.`
+        : 'השם עודכן בחשבון ובכל הקבוצות שלך.');
+  };
+
   const remove = async () => {
     setErr(null);
     if (unsynced > 0) { setErr('יש רישומים שעוד לא נשלחו לשרת. קודם להתחבר לרשת ולחכות שיישלחו.'); return; }
@@ -55,8 +76,24 @@ export default function Account() {
       <Txt size={26} weight="black" style={{ marginBottom: 12 }}>החשבון שלי</Txt>
       <ErrorBar text={err} onClose={() => setErr(null)} />
       <Card style={{ gap: 4, marginBottom: 12 }}>
-        <Txt weight="bold" size={18}>{name || ' '}</Txt>
-        <Txt muted size={14}>{session?.user.email ?? ''}</Txt>
+        {editName == null ? (
+          <>
+            <Txt weight="bold" size={18}>{name || ' '}</Txt>
+            <Txt muted size={14}>{session?.user.email ?? ''}</Txt>
+            <Btn small kind="ghost" title="✎ שינוי השם / כינוי" style={{ marginTop: 8 }} onPress={() => { setEditName(name); setRenameNote(null); }} />
+          </>
+        ) : (
+          <>
+            <Field label="השם או הכינוי שלך" value={editName} onChangeText={setEditName} maxLength={40} placeholder="למשל: הפטיש" />
+            <Seg value={allGroups} onChange={setAllGroups} options={[{ v: 'all', t: 'בחשבון ובכל הקבוצות' }, { v: 'account', t: 'רק בחשבון' }]} />
+            <Txt muted size={12}>"רק בחשבון": השם ישמש לקבוצות חדשות. בכל קבוצה אפשר גם לשנות בנפרד, בלשונית "שחקנים".</Txt>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+              <Btn small kind="ghost" title="ביטול" style={{ flex: 1 }} onPress={() => setEditName(null)} />
+              <Btn small title="שמירה" style={{ flex: 2 }} busy={busy} disabled={!editName.trim() || editName.trim() === name} onPress={() => void saveName()} />
+            </View>
+          </>
+        )}
+        {renameNote && <Txt size={13} color={C.pos} style={{ marginTop: 6 }}>{renameNote}</Txt>}
       </Card>
       <View style={{ gap: 10 }}>
         <Btn kind="ghost" title="יציאה מהחשבון" onPress={() => void supabase.auth.signOut()} />

@@ -8,7 +8,7 @@ import { useKeyboardInset } from '../../../lib/useKeyboardInset';
 import { useGame, type Row as Entry } from '../../../lib/useGame';
 import { chipsToIls } from '../../../core/settle';
 import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
-import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap, ConfirmBtn } from '../../../ui/kit';
+import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap, ConfirmBtn, fitSize } from '../../../ui/kit';
 import { ClockBar } from '../../../ui/tournament';
 import { DealerDraw } from '../../../ui/DealerDraw';
 import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
@@ -162,7 +162,7 @@ export default function Table() {
       <Back label="הקבוצה" to={`/group/${game.group_id}`} />
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <View style={{ gap: 4, flex: 1 }}>
-          <Txt size={26} weight="black">{game.name}</Txt>
+          <Txt size={26} weight="display" style={{ lineHeight: 32 }}>{game.name}</Txt>
           <Txt muted size={13}>
             {`${tour ? '🏆 טורניר · ' : ''}${game.settlement_mode === 'cash_on_table' ? 'מזומן על השולחן' : 'רישום · ביט'} · כניסה ${ils(game.buy_in_ils)}${game.rebuy_policy === 'none' ? ' · בלי ריבאיים' : ` · עד ${game.max_rebuys} ריבאיים`}`}
           </Txt>
@@ -209,7 +209,7 @@ export default function Table() {
           <View style={{ width: W, height: H, marginVertical: 8 }}>
             <View style={{ position: 'absolute', left: W * 0.22, top: H * 0.12, width: W * 0.56, height: H * 0.76, borderRadius: W, backgroundColor: g.felt.felt, borderWidth: 10, borderColor: g.felt.rail, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
               <Txt muted size={13} center>קופה</Txt>
-              <Num size={36} weight="black" color={C.acc} center>{ils(g.pot)}</Num>
+              <Num size={fitSize(ils(g.pot), W * 0.56 - 36, 36)} weight="black" color={C.acc} center numberOfLines={1}>{ils(g.pot)}</Num>
               <Txt muted size={12} center>{`${g.totals.reduce((s, t) => s + 1 + t.rebuys, 0)} כניסות`}</Txt>
             </View>
             {g.seats.map((s, i) => seatCard(s.player_id, { position: 'absolute', ...pos(i) }))}

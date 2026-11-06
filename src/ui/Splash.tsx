@@ -52,10 +52,10 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
       <Animated.View style={logoStyle}>
         <Logo size={112} />
       </Animated.View>
-      <Animated.Text style={wordStyle}>
+      <Animated.Text maxFontSizeMultiplier={1.2} style={wordStyle}>
         דילר
       </Animated.Text>
-      <Animated.Text style={tagStyle}>
+      <Animated.Text maxFontSizeMultiplier={1.2} style={tagStyle}>
         ערב פוקר לחבר'ה
       </Animated.Text>
     </Animated.View>

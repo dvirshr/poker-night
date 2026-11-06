@@ -10,7 +10,7 @@ import { supabase, heError } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { C, ils } from '../lib/theme';
 import { pendingInvite, clearPendingInvite } from '../lib/invite';
-import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge , RefreshBtn, useOnResume } from '../ui/kit';
+import { Screen, H1, Card, Txt, Btn, Field, Seg, ErrorBar, Row, Badge , RefreshBtn, useOnResume, keep } from '../ui/kit';
 
 type Membership = { id: string; role: string; status: string; group_id: string; groups: { name: string; archived_at: string | null; deleted_at: string | null } | null };
 type OpenGame = { id: string; name: string; status: string; group_id: string };
@@ -186,7 +186,7 @@ export default function Home() {
                     `${info[g.group_id].players} שחקנים`,
                     info[g.group_id].last ? `ערב אחרון ${shortDate(info[g.group_id].last!)}` : 'עוד לא שיחקו',
                     info[g.group_id].leader ? `מוביל: ${info[g.group_id].leader}` : null,
-                  ].filter(Boolean).join(' · ')}</Txt>
+                  ].filter((x): x is string => !!x).map(keep).join(' · ')}</Txt>
                 )}
               </View>
               <Row style={{ gap: 10 }}>

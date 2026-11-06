@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { C, F, ils, medal, blinds, ltr } from '../lib/theme';
 import { makeStructure, mmss, PAYOUT_PRESETS, type Level } from '../core/clock';
 import { tournamentPrizes } from '../core/settle';
+import { MAX_FONT_SCALE } from './kit';
 import { Txt, Num, Btn, Card, Row, tap } from './kit';
 import { useClock } from '../lib/useClock';
 import type { Game } from '../lib/useGame';
@@ -15,6 +16,7 @@ function Cell({ value, onChange, width = 72, label }: { value: number; onChange:
   const shown = parseInt(txt, 10) === value || (txt === '' && !value) ? txt : String(value);
   return (
     <TextInput
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       accessibilityLabel={label}
       value={shown}
       onChangeText={t => { const d = digits(t); setTxt(d); onChange(parseInt(d, 10) || 0); }}

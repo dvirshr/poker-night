@@ -10,7 +10,7 @@ import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
 import { hostTable } from '../../core/hosting';
 import { monthName, periods, byKind, type Standing, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
 import { THEMES, type ThemeKey } from '../../lib/theme';
-import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume, ConfirmBtn } from '../../ui/kit';
+import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume, ConfirmBtn, keep } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
 type Game = { id: string; name: string; status: string; played_on: string; created_at: string; game_type?: string; host_player_id?: string | null };
@@ -219,9 +219,10 @@ export default function Group() {
                       <Num weight="black" size={16} color={C.muted}>{r.qualified ? String(rank) : '–'}</Num>
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Txt weight="bold">{`${r.name} ${titleBadges(stats.titles.get(r.playerId))}`}</Txt>
-                        <Txt muted size={12}>{kind === 'tournament'
-                          ? `${r.nights === 1 ? 'טורניר אחד' : `${r.nights} טורנירים`} · ${r.wins} 🏆 · ${r.podiums} פודיומים · סה״כ ${ils(r.net, true)}`
-                          : `${r.nights === 1 ? 'ערב אחד' : `${r.nights} ערבים`} · ${r.wins === 1 ? 'נצחון אחד' : `${r.wins} נצחונות`} · ${sort === 'total' ? `ממוצע ${ils(Math.round(r.avg), true)}` : `סה״כ ${ils(r.net, true)}`}`}</Txt>
+                        <Txt muted size={12}>{(kind === 'tournament'
+                          ? [r.nights === 1 ? 'טורניר אחד' : `${r.nights} טורנירים`, `${r.wins} 🏆`, `${r.podiums} פודיומים`, `סה״כ ${ils(r.net, true)}`]
+                          : [r.nights === 1 ? 'ערב אחד' : `${r.nights} ערבים`, r.wins === 1 ? 'נצחון אחד' : `${r.wins} נצחונות`, sort === 'total' ? `ממוצע ${ils(Math.round(r.avg), true)}` : `סה״כ ${ils(r.net, true)}`]
+                        ).map(keep).join(' · ')}</Txt>
                       </View>
                     </Row>
                     <Num weight="black" size={18} color={tone(r)} style={{ flexShrink: 0, marginStart: 8 }}>{metric(r)}</Num>

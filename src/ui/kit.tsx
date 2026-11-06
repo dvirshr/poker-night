@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, AppState, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, AppState, Modal, PixelRatio, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,14 +30,38 @@ export function Screen({ children, scroll = true, footer }: { children: ReactNod
   );
 }
 
-type TxtProps = { children: ReactNode; style?: TextStyle | TextStyle[]; muted?: boolean; size?: number; weight?: keyof typeof F; color?: string; center?: boolean };
-export function Txt({ children, style, muted, size = 15, weight = 'regular', color, center }: TxtProps) {
+type TxtProps = { children: ReactNode; style?: TextStyle | TextStyle[]; muted?: boolean; size?: number; weight?: keyof typeof F; color?: string; center?: boolean; numberOfLines?: number };
+/**
+ * Largest system-font enlargement we follow (Samsung / Android "font size", iOS Dynamic Type).
+ * Beyond it rows would no longer fit; the layout is checked at this scale on a 360dp-wide phone.
+ * On the web, ?fs=1.2 in the address bar previews the app at that scale (for checking layouts).
+ */
+export const MAX_FONT_SCALE = 1.2;
+const QA_SCALE = Platform.OS === 'web' && typeof window !== 'undefined'
+  ? Math.min(2, Math.max(1, Number(new URLSearchParams(window.location.search).get('fs')) || 1)) : 1;
+
+/** How much the phone enlarges text right now (after our cap). */
+export function fontScale() {
+  return Platform.OS === 'web' ? QA_SCALE : Math.min(PixelRatio.getFontScale(), MAX_FONT_SCALE);
+}
+
+/** Largest font size (up to max) at which a one-line number fits the width, at the phone's text scale. */
+export function fitSize(text: string, width: number, max: number) {
+  const em = 0.62; // average glyph width of digits and ₪ in Rubik, in em
+  return Math.max(14, Math.min(max, Math.floor(width / (Math.max(text.length, 1) * em * fontScale()))));
+}
+
+/** Keeps "ממוצע +132 ₪" together: no line break inside a segment, only between segments. */
+export const keep = (s: string) => s.replace(/ /g, '\u00A0');
+
+export function Txt({ children, style, muted, size = 15, weight = 'regular', color, center, numberOfLines }: TxtProps) {
   return (
     <Text
       // phones with a large system font (Samsung "font size") scale text; cap it so rows still fit
-      maxFontSizeMultiplier={1.2}
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
+      numberOfLines={numberOfLines}
       style={[
-        { fontFamily: F[weight], fontSize: size, color: color ?? (muted ? C.muted : C.text), textAlign: center ? 'center' : 'right', writingDirection: 'rtl' },
+        { fontFamily: F[weight], fontSize: size * QA_SCALE, color: color ?? (muted ? C.muted : C.text), textAlign: center ? 'center' : 'right', writingDirection: 'rtl' },
         style as TextStyle,
       ]}
     >
@@ -102,7 +126,7 @@ export function Field({ label, ...p }: TextInputProps & { label: string }) {
   return (
     <View style={{ gap: 6, marginBottom: 14 }}>
       <Txt muted size={13}>{label}</Txt>
-      <TextInput placeholderTextColor={C.muted} {...p} style={[s.input, p.style]} />
+      <TextInput placeholderTextColor={C.muted} maxFontSizeMultiplier={MAX_FONT_SCALE} {...p} style={[s.input, QA_SCALE !== 1 && { fontSize: 16 * QA_SCALE }, p.style]} />
     </View>
   );
 }

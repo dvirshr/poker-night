@@ -5,6 +5,7 @@ import { supabase, heError, APP_VERSION } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { pending } from '../lib/queue';
 import { clearPendingInvite, APP_URL } from '../lib/invite';
+import { rememberName, forgetName } from '../lib/greetings';
 import { C } from '../lib/theme';
 import { Screen, Txt, Card, Back, Btn, ErrorBar, ConfirmBtn, Field, Seg } from '../ui/kit';
 
@@ -50,6 +51,7 @@ export default function Account() {
     const rows = (data ?? []) as { group_name: string; renamed: boolean }[];
     const skipped = rows.filter(r => !r.renamed).map(r => r.group_name);
     setName(editName.trim());
+    rememberName(editName.trim());
     setEditName(null);
     setRenameNote(allGroups === 'account'
       ? 'השם בחשבון עודכן. בקבוצות הקיימות השם לא השתנה.'
@@ -65,6 +67,7 @@ export default function Account() {
     const { error } = await supabase.rpc('delete_account');
     if (error) { setBusy(false); setErr(heError(error)); return; }
     clearPendingInvite();
+    forgetName();
     await supabase.auth.signOut({ scope: 'local' });
     setBusy(false);
     router.replace('/login');
@@ -96,7 +99,7 @@ export default function Account() {
         {renameNote && <Txt size={13} color={C.pos} style={{ marginTop: 6 }}>{renameNote}</Txt>}
       </Card>
       <View style={{ gap: 10 }}>
-        <Btn kind="ghost" title="יציאה מהחשבון" onPress={() => void supabase.auth.signOut()} />
+        <Btn kind="ghost" title="יציאה מהחשבון" onPress={() => { forgetName(); void supabase.auth.signOut(); }} />
         <Btn kind="ghost" title={mailSent ? 'נשלח קישור למייל ✓' : 'שינוי סיסמה (קישור למייל)'} disabled={mailSent} onPress={() => void changePassword()} />
         <Btn kind="ghost" title="פרטיות ותנאי שימוש" onPress={() => router.push('/privacy')} />
         {operator && <Btn kind="ghost" title="🛠 ניהול מערכת" onPress={() => router.push('/admin')} />}

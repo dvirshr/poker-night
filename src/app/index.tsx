@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { UpdateBanner } from '../ui/UpdateBanner';
 import { Brand, IconBtn, Icon } from '../ui/brand';
+import { rememberName } from '../lib/greetings';
 import { Pressable } from 'react-native';
 import { supabase, heError } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -48,6 +49,7 @@ export default function Home() {
     void loadExtras(mine.filter(x => x.status === 'active').map(x => x.group_id), ((g.data ?? []) as OpenGame[]).map(x => x.id));
     const myName = p.data?.display_name ?? '';
     setMe(myName);
+    rememberName(myName);
     const code = pendingInvite();
     if (code && myName) {
       clearPendingInvite();

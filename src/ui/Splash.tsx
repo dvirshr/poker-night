@@ -5,6 +5,7 @@ const ND = Platform.OS !== 'web'; // native driver on the phone; the web runs th
 import * as SplashScreen from 'expo-splash-screen';
 import { C } from '../lib/theme';
 import { Logo } from './brand';
+import { pickGreeting, rememberedName } from '../lib/greetings';
 
 /**
  * Animated opening screen (about 1.6 s, no sound). Starts exactly where the native splash leaves off
@@ -16,6 +17,7 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
   const word = useRef(new Animated.Value(0)).current;  // 0 → 1: wordmark in
   const out = useRef(new Animated.Value(1)).current;   // 1 → 0: fade away
   const intro = useRef(false);
+  const line = useRef({ name: rememberedName(), text: pickGreeting() }).current;
   const readyRef = useRef(ready);
   readyRef.current = ready;
 
@@ -25,7 +27,7 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
     Animated.sequence([
       Animated.timing(logo, { toValue: 1, duration: 520, easing: Easing.out(Easing.back(1.6)), useNativeDriver: ND }),
       Animated.timing(word, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: ND }),
-      Animated.delay(450),
+      Animated.delay(950), // half a second longer, to read the greeting
     ]).start(() => { intro.current = true; if (readyRef.current) leave(); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -39,7 +41,7 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
   const tagY: AV = word.interpolate({ inputRange: [0, 1], outputRange: [12, -8] });
   const logoStyle = { transform: [{ translateY: logoY }, { scale: logoS }, { rotate: logoR }] } as object;
   const wordStyle = { fontFamily: 'SecularOne_400Regular', fontSize: 48, color: C.text, marginTop: 4, opacity: word, transform: [{ translateY: wordY }] } as object;
-  const tagStyle = { fontFamily: 'Rubik_400Regular', fontSize: 14, color: C.muted, opacity: word, transform: [{ translateY: tagY }] } as object;
+  const tagStyle = { fontFamily: 'Rubik_500Medium', fontSize: 17, color: C.acc, textAlign: 'center', paddingHorizontal: 28, marginTop: 6, opacity: word, transform: [{ translateY: tagY }] } as object;
   const left = useRef(false);
   function leave() {
     if (left.current) return;
@@ -56,7 +58,7 @@ export function Splash({ ready, onDone }: { ready: boolean; onDone: () => void }
         דילר
       </Animated.Text>
       <Animated.Text maxFontSizeMultiplier={1.2} style={tagStyle}>
-        ערב פוקר לחבר'ה
+        {line.name ? `${line.name}, ${line.text}` : line.text}
       </Animated.Text>
     </Animated.View>
   );

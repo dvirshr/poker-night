@@ -9,7 +9,8 @@ import { inviteLink, inviteMessage } from '../../lib/invite';
 import { useGroupStats, titleBadges } from '../../lib/useGroupStats';
 import { hostTable } from '../../core/hosting';
 import { monthName, periods, byKind, type Standing, league as leagueRows, MIN_NIGHTS, type LeagueRow, type LeagueSort } from '../../core/stats';
-import { THEMES, type ThemeKey } from '../../lib/theme';
+import { THEMES, EMBLEMS, type ThemeKey } from '../../lib/theme';
+import { TableSwatch } from '../../ui/TableArt';
 import { Screen, H1, Card, Txt, Num, Btn, Field, Seg, ErrorBar, Row, Badge, Back, RefreshBtn, useOnResume, ConfirmBtn, keep } from '../../ui/kit';
 
 type Player = { id: string; display_name: string; role: string; status: string; is_guest: boolean; profile_id: string | null };
@@ -19,7 +20,7 @@ type League = { player_id: string; display_name: string; games_played: number; n
 export default function Group() {
   const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: string }>();
   const { userId } = useAuth();
-  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey; hosting_enabled?: boolean; host_rotation?: string[]; archived_at?: string | null; deleted_at?: string | null } | null>(null);
+  const [group, setGroup] = useState<{ name: string; banker_mode: string; table_theme?: ThemeKey; emblem?: string | null; hosting_enabled?: boolean; host_rotation?: string[]; archived_at?: string | null; deleted_at?: string | null } | null>(null);
   const [gname, setGname] = useState('');
   const [myName, setMyName] = useState<string | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
@@ -586,9 +587,28 @@ export default function Group() {
                     onPress={() => run(() => supabase.from('groups').update({ table_theme: k }).eq('id', id))}
                     style={{ width: 92, alignItems: 'center', padding: 10, borderWidth: on ? 2 : 1, borderColor: on ? C.acc : C.line }}
                   >
-                    <View style={{ width: 56, height: 34, borderRadius: 17, backgroundColor: t.felt, borderWidth: 4, borderColor: t.rail }} />
+                    <TableSwatch t={t} w={72} h={46} />
                     <Txt size={12} weight={on ? 'bold' : 'regular'} center>{t.name}</Txt>
                   </Card>
+                );
+              })}
+            </View>
+          </Card>
+
+          <Card style={{ gap: 6 }}>
+            <Txt weight="bold" size={16}>סמל הקבוצה על השולחן</Txt>
+            <Txt muted size={12}>מודפס במרכז הלבד, אצל כל החברים.</Txt>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {[null, ...EMBLEMS].map(e => {
+                const on = (group.emblem ?? null) === e;
+                return (
+                  <Pressable
+                    key={e ?? 'none'}
+                    onPress={() => run(() => supabase.from('groups').update({ emblem: e }).eq('id', id))}
+                    style={{ width: 46, height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: C.raised, borderWidth: on ? 2 : 1, borderColor: on ? C.acc : C.line }}
+                  >
+                    <Txt size={e ? 22 : 12} muted={!e}>{e ?? 'בלי'}</Txt>
+                  </Pressable>
                 );
               })}
             </View>

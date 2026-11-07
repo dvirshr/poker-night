@@ -11,6 +11,7 @@ import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
 import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap, ConfirmBtn, fitSize, keep } from '../../../ui/kit';
 import { ClockBar } from '../../../ui/tournament';
 import { DealerDraw } from '../../../ui/DealerDraw';
+import { TableArt, TableSwatch } from '../../../ui/TableArt';
 import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
 import { tournamentPrizes } from '../../../core/settle';
 
@@ -82,6 +83,8 @@ export default function Table() {
     const ry = H / 2 - SEAT_H / 2 - 2;
     return { left: W / 2 + rx * Math.cos(a) - SEAT_W / 2, top: H / 2 + ry * Math.sin(a) - SEAT_H / 2 };
   };
+  const rail = { x: Math.round(W * 0.2), y: Math.round(H * 0.1), w: Math.round(W * 0.6), h: Math.round(H * 0.8) };
+  const inner = Math.min(rail.w - 32, W - 2 * SEAT_W - 8); // felt text never runs under the side seats
   const me = g.mySeat ? tot(g.mySeat.player_id) : null;
   const rebuysLeft = (pid: string) => (game.rebuy_policy === 'none' ? 0 : game.max_rebuys - tot(pid).rebuys);
 
@@ -207,11 +210,16 @@ export default function Table() {
 
       <View onLayout={e => setWidth(Math.min(e.nativeEvent.layout.width, 440))} style={{ width: '100%', alignItems: 'center' }}>
         {oval ? (
-          <View style={{ width: W, height: H, marginVertical: 8 }}>
-            <View style={{ position: 'absolute', left: W * 0.22, top: H * 0.12, width: W * 0.56, height: H * 0.76, borderRadius: W, backgroundColor: g.felt.felt, borderWidth: 10, borderColor: g.felt.rail, alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-              <Txt muted size={13} center>קופה</Txt>
-              <Num size={fitSize(ils(g.pot), W * 0.56 - 36, 36)} weight="black" color={C.acc} center numberOfLines={1}>{ils(g.pot)}</Num>
+          <View style={{ width: W, height: H, marginVertical: 8, borderRadius: 18, overflow: 'hidden' }}>
+            <TableArt t={g.felt} w={W} h={H} rail={rail} />
+            <View style={{ position: 'absolute', left: (W - inner) / 2, top: rail.y + 24, width: inner, height: rail.h - 48, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+              {g.print.emblem ? <Txt size={30} center style={{ opacity: 0.55 }}>{g.print.emblem}</Txt> : null}
+              {g.print.nightNo ? <Txt muted size={12} center>{`ערב #${g.print.nightNo}`}</Txt> : null}
+              <Txt muted size={13} center style={{ marginTop: 4 }}>קופה</Txt>
+              <Num size={fitSize(ils(g.pot), inner - 8, 36)} weight="black" color={C.acc} center numberOfLines={1}>{ils(g.pot)}</Num>
               <Txt muted size={12} center>{`${g.totals.reduce((s, t) => s + 1 + t.rebuys, 0)} כניסות`}</Txt>
+              {g.print.group ? <Txt weight="display" size={15} center numberOfLines={1} fit color="#FFFFFF" style={{ opacity: 0.32, marginTop: 8 }}>{`דילר · ${g.print.group}`}</Txt> : null}
+              {g.print.champion ? <Txt size={11} center numberOfLines={2} color={C.muted} style={{ opacity: 0.85 }}>{`👑 האלוף מהפעם הקודמת: ${g.print.champion}`}</Txt> : null}
             </View>
             {g.seats.map((s, i) => seatCard(s.player_id, { position: 'absolute', ...pos(i) }))}
           </View>
@@ -278,7 +286,7 @@ export default function Table() {
             const on = g.myTheme === k;
             return (
               <Pressable key={k ?? 'group'} onPress={() => { tap(); g.chooseTheme(k); }} style={{ width: 96, alignItems: 'center', gap: 6 }}>
-                <View style={{ width: 84, height: 56, borderRadius: 28, backgroundColor: t.felt, borderWidth: 6, borderColor: on ? C.acc : t.rail }} />
+                <View style={{ borderRadius: 12, borderWidth: 2, borderColor: on ? C.acc : 'transparent' }}><TableSwatch t={t} /></View>
                 <Txt size={13} weight={on ? 'bold' : 'regular'} color={on ? C.acc : C.text} center>{k ? t.name : `של הקבוצה (${t.name})`}</Txt>
               </Pressable>
             );

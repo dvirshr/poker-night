@@ -46,6 +46,8 @@ export type Settlement = { from_player_id: string | null; to_player_id: string; 
 export type Live = 'live' | 'reconnecting';
 export type Draw = { id: string; player_id: string; draw_no: number; pool: number; drawn_at: string };
 
+export type FeltPrint = { group: string; emblem: string | null; nightNo: number | null; champion: string | null };
+
 export function useGame(gameId: string) {
   const { userId } = useAuth();
   const [game, setGame] = useState<Game | null>(null);
@@ -63,6 +65,7 @@ export function useGame(gameId: string) {
   const [levels, setLevels] = useState<Level[]>([]);
   const [draws, setDraws] = useState<Draw[]>([]);
   const [hostName, setHostName] = useState<string | null>(null);
+  const [print, setPrint] = useState<FeltPrint>({ group: '', emblem: null, nightNo: null, champion: null });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
@@ -87,7 +90,9 @@ export function useGame(gameId: string) {
       supabase.from('groups').select('*').eq('id', (g.data as Game).group_id).maybeSingle(),
     ]);
     setIsAdmin((me.data as { role?: string } | null)?.role === 'admin');
-    const tk = (grp.data as { table_theme?: ThemeKey } | null)?.table_theme;
+    const gd = grp.data as { name?: string; emblem?: string | null; table_theme?: ThemeKey } | null;
+    setPrint(p => ({ ...p, group: gd?.name ?? '', emblem: gd?.emblem ?? null }));
+    const tk = gd?.table_theme;
     if (tk && THEMES[tk]) setTheme(tk);
     setSeats(
       (gp.data ?? [])
@@ -199,8 +204,32 @@ export function useGame(gameId: string) {
   const mySeat = seats.find(s => s.profile_id === userId) ?? null;
   const unsynced = queued.length;
 
+  // printed on the felt: night number in the group and the winner of the previous night (once per game)
+  const gid = game?.group_id;
+  useEffect(() => {
+    if (!gid || !game) return;
+    let dead = false;
+    (async () => {
+      const { data } = await supabase.from('games').select('id, status, played_on, created_at').eq('group_id', gid);
+      const nights = ((data ?? []) as { id: string; status: string; played_on: string; created_at: string }[])
+        .filter(n => n.status !== 'cancelled')
+        .sort((a, b) => a.played_on.localeCompare(b.played_on) || a.created_at.localeCompare(b.created_at));
+      const i = nights.findIndex(n => n.id === gameId);
+      const prev = nights.slice(0, i < 0 ? nights.length : i).reverse().find(n => n.status === 'closed');
+      let champion: string | null = null;
+      if (prev) {
+        const t = await supabase.from('game_player_totals').select('display_name, net, finish_place').eq('game_id', prev.id);
+        const rows = (t.data ?? []) as { display_name: string; net: number; finish_place: number | null }[];
+        const best = rows.find(r => r.finish_place === 1) ?? [...rows].sort((a, b) => b.net - a.net)[0];
+        if (best && (best.finish_place === 1 || best.net > 0)) champion = best.display_name;
+      }
+      if (!dead) setPrint(p => ({ ...p, nightNo: i < 0 ? null : i + 1, champion }));
+    })();
+    return () => { dead = true; };
+  }, [gid, gameId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return {
-    game, seats, rows, totals, settlements, levels, draws, hostName, live, error, setError, loaded, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
+    game, seats, rows, totals, settlements, levels, draws, hostName, live, error, setError, loaded, print, isBanker, isAdmin, mySeat, unsynced, felt: THEMES[myTheme ?? theme], groupTheme: theme, myTheme, chooseTheme,
     pot: potOf(totals), gap: gapOf(totals), reload: load,
   };
 }

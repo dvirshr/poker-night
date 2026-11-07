@@ -27,3 +27,14 @@ test('table: times, last date, who is next', () => {
     ['ron', 2, '2026-10-15', false], ['gal', 1, '2026-10-08', true], ['maya', 0, null, false],
   ]);
 });
+
+test('a cancelled night neither counts nor moves the turn', () => {
+  const rot = ['a', 'b', 'c'];
+  const nights: HostedNight[] = [
+    { gameId: '1', playedOn: '2026-10-01', createdAt: '2026-10-01T20:00', hostId: 'a', status: 'closed' },
+    { gameId: '2', playedOn: '2026-10-08', createdAt: '2026-10-08T20:00', hostId: 'b', status: 'cancelled' }, // opened by mistake
+  ];
+  assert.equal(nextHost(rot, nights), 'b');
+  const t = hostTable(rot, nights);
+  assert.deepEqual(t.map(r => [r.playerId, r.times, r.isNext]), [['a', 1, false], ['b', 0, true], ['c', 0, false]]);
+});

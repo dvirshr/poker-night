@@ -30,7 +30,7 @@ export function Screen({ children, scroll = true, footer }: { children: ReactNod
   );
 }
 
-type TxtProps = { children: ReactNode; style?: TextStyle | TextStyle[]; muted?: boolean; size?: number; weight?: keyof typeof F; color?: string; center?: boolean; numberOfLines?: number };
+type TxtProps = { children: ReactNode; style?: TextStyle | TextStyle[]; muted?: boolean; size?: number; weight?: keyof typeof F; color?: string; center?: boolean; numberOfLines?: number; fit?: boolean };
 /**
  * Largest system-font enlargement we follow (Samsung / Android "font size", iOS Dynamic Type).
  * Beyond it rows would no longer fit; the layout is checked at this scale on a 360dp-wide phone.
@@ -54,12 +54,14 @@ export function fitSize(text: string, width: number, max: number) {
 /** Keeps "ממוצע +132 ₪" together: no line break inside a segment, only between segments. */
 export const keep = (s: string) => s.replace(/ /g, '\u00A0');
 
-export function Txt({ children, style, muted, size = 15, weight = 'regular', color, center, numberOfLines }: TxtProps) {
+export function Txt({ children, style, muted, size = 15, weight = 'regular', color, center, numberOfLines, fit }: TxtProps) {
   return (
     <Text
       // phones with a large system font (Samsung "font size") scale text; cap it so rows still fit
       maxFontSizeMultiplier={MAX_FONT_SCALE}
       numberOfLines={numberOfLines}
+      adjustsFontSizeToFit={fit}
+      minimumFontScale={fit ? 0.75 : undefined}
       style={[
         { fontFamily: F[weight], fontSize: size * QA_SCALE, color: color ?? (muted ? C.muted : C.text), textAlign: center ? 'center' : 'right', writingDirection: 'rtl' },
         style as TextStyle,
@@ -104,7 +106,7 @@ export function Btn({ title, onPress, kind = 'primary', disabled, busy, style, s
       {busy ? (
         <ActivityIndicator color={primary ? C.accInk : C.text} />
       ) : (
-        <Txt center weight={small ? (primary ? 'black' : 'bold') : 'display'} size={small ? 15 : 19} color={primary ? C.accInk : kind === 'danger' ? C.danger : C.text}>
+        <Txt center numberOfLines={1} fit weight={small ? (primary ? 'black' : 'bold') : 'display'} size={small ? 15 : 19} color={primary ? C.accInk : kind === 'danger' ? C.danger : C.text}>
           {title}
         </Txt>
       )}

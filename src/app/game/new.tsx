@@ -51,10 +51,10 @@ export default function NewGame() {
       if (g.data?.hosting_enabled) {
         const rot = ((g.data.host_rotation ?? []) as string[]);
         setHosting({ on: true, rotation: rot });
-        const past = await supabase.from('games').select('id, played_on, created_at, host_player_id').eq('group_id', group);
+        const past = await supabase.from('games').select('id, played_on, created_at, host_player_id, status').eq('group_id', group);
         const nx = nextHost(rot.filter(pid => (p.data ?? []).some((x: { id: string }) => x.id === pid)),
-          ((past.data ?? []) as { id: string; played_on: string; created_at: string; host_player_id: string | null }[])
-            .map(r => ({ gameId: r.id, playedOn: r.played_on, createdAt: r.created_at, hostId: r.host_player_id })));
+          ((past.data ?? []) as { id: string; played_on: string; created_at: string; host_player_id: string | null; status: string }[])
+            .map(r => ({ gameId: r.id, playedOn: r.played_on, createdAt: r.created_at, hostId: r.host_player_id, status: r.status })));
         if (nx) setHost(nx);
       }
       const list = (p.data ?? []) as Player[];

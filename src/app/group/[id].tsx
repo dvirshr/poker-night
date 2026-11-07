@@ -64,7 +64,7 @@ export default function Group() {
   const pendingList = players.filter(p => p.status === 'pending');
   const hostingOn = !!group?.hosting_enabled;
   const rotation = (group?.host_rotation ?? []).filter(pid => active.some(p => p.id === pid));
-  const hostedNights = games.map(g => ({ gameId: g.id, playedOn: g.played_on, createdAt: g.created_at, hostId: g.host_player_id ?? null }));
+  const hostedNights = games.map(g => ({ gameId: g.id, playedOn: g.played_on, createdAt: g.created_at, hostId: g.host_player_id ?? null, status: g.status }));
   const pname = (pid: string | null | undefined) => players.find(p => p.id === pid)?.display_name ?? '';
   const setRotation = (r: string[]) => run(() => supabase.from('groups').update({ host_rotation: r }).eq('id', id));
   const guests = active.filter(p => !p.profile_id);

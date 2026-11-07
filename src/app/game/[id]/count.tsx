@@ -126,7 +126,7 @@ export default function Count() {
         ) : existing ? undefined : (
           <Row>
             <Btn title="הפסיד הכול" kind="ghost" style={{ flex: 1 }} onPress={() => save(0)} disabled={!cur} />
-            <Btn title="שמירה והבא" style={{ flex: 2 }} onPress={() => save(chips)} disabled={!cur || !digits} />
+            <Btn title="שמירה והבא" style={{ flex: 1 }} onPress={() => save(chips)} disabled={!cur || !digits} />
           </Row>
         )
       }

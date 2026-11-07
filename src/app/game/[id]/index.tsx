@@ -8,7 +8,7 @@ import { useKeyboardInset } from '../../../lib/useKeyboardInset';
 import { useGame, type Row as Entry } from '../../../lib/useGame';
 import { chipsToIls } from '../../../core/settle';
 import { C, ils, THEMES, type ThemeKey } from '../../../lib/theme';
-import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap, ConfirmBtn, fitSize } from '../../../ui/kit';
+import { Screen, Txt, Num, Btn, Card, Field, ErrorBar, LivePill, Badge, Row, Back, Loading, tap, ConfirmBtn, fitSize, keep } from '../../../ui/kit';
 import { ClockBar } from '../../../ui/tournament';
 import { DealerDraw } from '../../../ui/DealerDraw';
 import { useAlertPref, useBlindAlertsSync } from '../../../lib/useClock';
@@ -162,9 +162,10 @@ export default function Table() {
       <Back label="הקבוצה" to={`/group/${game.group_id}`} />
       <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
         <View style={{ gap: 4, flex: 1 }}>
-          <Txt size={26} weight="display" style={{ lineHeight: 32 }}>{game.name}</Txt>
+          <Txt size={24} weight="display" style={{ lineHeight: 30 }}>{game.name}</Txt>
           <Txt muted size={13}>
-            {`${tour ? '🏆 טורניר · ' : ''}${game.settlement_mode === 'cash_on_table' ? 'מזומן על השולחן' : 'רישום · ביט'} · כניסה ${ils(game.buy_in_ils)}${game.rebuy_policy === 'none' ? ' · בלי ריבאיים' : ` · עד ${game.max_rebuys} ריבאיים`}`}
+            {[tour ? '🏆 טורניר' : null, game.settlement_mode === 'cash_on_table' ? 'מזומן על השולחן' : 'רישום בביט', `כניסה ${ils(game.buy_in_ils)}`,
+              game.rebuy_policy === 'none' ? 'בלי ריבאיים' : `עד ${game.max_rebuys} ריבאיים`].filter((x): x is string => !!x).map(keep).join(' · ')}
           </Txt>
           {(g.hostName || ((g.isBanker || g.isAdmin) && game.status !== 'closed')) && (
             <Pressable disabled={!(g.isBanker || g.isAdmin) || game.status === 'closed'} onPress={() => setHostPick(true)}>
